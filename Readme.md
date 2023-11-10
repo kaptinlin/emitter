@@ -51,12 +51,12 @@ e := emitter.NewMemoryEmitter(
 
 ### Options
 
-| Option                                       | Description                                              |
-|----------------------------------------------|----------------------------------------------------------|
-| `WithPool(pool emitter.Pool)`                | Assign a goroutine pool for concurrent event handling.   |
-| `WithErrorHandler(handler func(error) error)`| Set a custom error handler for the emitter.              |
-| `WithIDGenerator(generator func() string)`   | Define a function for generating unique listener IDs.    |
-| `WithPanicHandler(handler func(interface{}))`| Implement a panic recovery strategy.                     |
+| Option                                         | Description                                                  |
+|------------------------------------------------|--------------------------------------------------------------|
+| `WithPool(pool emitter.Pool)`                  | Assign a goroutine pool for concurrent event handling.       |
+| `WithErrorHandler(handler func(emitter.Event, error) error)` | Set a custom error handler for the emitter that receives an event and an error. |
+| `WithIDGenerator(generator func() string)`     | Define a function for generating unique listener IDs.        |
+| `WithPanicHandler(handler func(interface{}))`  | Implement a panic recovery strategy.                         |
 
 ## Wildcard Event Subscription
 
@@ -153,16 +153,16 @@ import (
 )
 
 func main() {
-	// Define a custom error handler that logs the error
-	logErrorHandler := func(err error) error {
-		log.Printf("Error encountered: %v", err)
-		return err  // Optionally handle the error
+	// Define a custom error handler that logs the event and the error
+	customErrorHandler := func(event emitter.Event, err error) error {
+		log.Printf("Error encountered during event '%s': %v, with payload: %v", event.Topic(), err, event.Payload())
+		return nil  // Returning nil to indicate that the error has been handled
 	}
 
 	// Apply the custom error handler to the emitter
-	e := emitter.NewMemoryEmitter(emitter.WithErrorHandler(logErrorHandler))
+	e := emitter.NewMemoryEmitter(emitter.WithErrorHandler(customErrorHandler))
 
-	// Your emitter will now log errors encountered during event handling
+	// Your emitter will now log detailed errors encountered during event handling
 }
 ```
 

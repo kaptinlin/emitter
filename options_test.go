@@ -15,11 +15,12 @@ func TestWithErrorHandler(t *testing.T) {
 	customError := errors.New("custom error")
 
 	// Define a custom error handler that sets handlerCalled to true.
-	customErrorHandler := func(err error) error {
+	customErrorHandler := func(event Event, err error) error {
 		if err == customError {
 			handlerCalled = true
+			t.Logf("Custom error handler called with event: %s and error: %s", event.Topic(), err.Error())
 		}
-		return err
+		return nil // Returning nil to indicate the error is handled.
 	}
 
 	// Create a new MemoryEmitter with the custom error handler.
@@ -37,14 +38,13 @@ func TestWithErrorHandler(t *testing.T) {
 	}
 
 	// Emit the event synchronously to trigger the error.
-	emitter.EmitSync("testTopic", "testPayload")
+	emitter.EmitSync("testTopic", NewBaseEvent("testTopic", "testPayload"))
 
 	// Check if the custom error handler was called.
 	if !handlerCalled {
 		t.Fatalf("Custom error handler was not called on listener error")
 	}
 }
-
 func TestWithErrorHandlerAsync(t *testing.T) {
 	// Define a variable to determine if the custom error handler was called.
 	var handlerCalled bool
@@ -54,13 +54,13 @@ func TestWithErrorHandlerAsync(t *testing.T) {
 	customError := errors.New("custom error")
 
 	// Define a custom error handler that sets handlerCalled to true.
-	customErrorHandler := func(err error) error {
+	customErrorHandler := func(event Event, err error) error {
 		handlerMutex.Lock()
 		defer handlerMutex.Unlock()
 		if err == customError {
 			handlerCalled = true
 		}
-		return err
+		return nil // Assume the error is handled and return nil.
 	}
 
 	// Create a new MemoryEmitter with the custom error handler.
@@ -78,12 +78,12 @@ func TestWithErrorHandlerAsync(t *testing.T) {
 	}
 
 	// Emit the event asynchronously to trigger the error.
-	errChan := emitter.Emit("testTopic", "testPayload")
+	errChan := emitter.Emit("testTopic", NewBaseEvent("testTopic", "testPayload"))
 
 	// Wait for all errors to be processed.
 	for err := range errChan {
-		if err != customError {
-			t.Errorf("Expected custom error, got: %v", err)
+		if err != nil {
+			t.Errorf("Expected nil error due to custom handler, got: %v", err)
 		}
 	}
 

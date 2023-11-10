@@ -10,13 +10,13 @@ import (
 // facilities for adding and removing listeners, emitting events, and configuring
 // the behavior of event handling within the application.
 type MemoryEmitter struct {
-	topics            sync.Map          // Stores topics with concurrent access support.
-	errorHandler      func(error) error // Handles errors that occur during event handling.
-	idGenerator       func() string     // Generates unique IDs for listeners.
-	panicHandler      PanicHandler      // Handles panics that occur during event handling.
-	Pool              Pool              // Manages concurrent execution of event handlers.
-	closed            atomic.Value      // Indicates whether the emitter is closed.
-	errChanBufferSize int               // Size of the buffer for the error channel in Emit.
+	topics            sync.Map                 // Stores topics with concurrent access support.
+	errorHandler      func(Event, error) error // Handles errors that occur during event handling.
+	idGenerator       func() string            // Generates unique IDs for listeners.
+	panicHandler      PanicHandler             // Handles panics that occur during event handling.
+	Pool              Pool                     // Manages concurrent execution of event handlers.
+	closed            atomic.Value             // Indicates whether the emitter is closed.
+	errChanBufferSize int                      // Size of the buffer for the error channel in Emit.
 }
 
 // NewMemoryEmitter initializes a new MemoryEmitter with optional configuration options.
@@ -126,10 +126,11 @@ func (m *MemoryEmitter) handleEvents(eventName string, payload interface{}, erro
 		topicName := key.(string)
 		if matchEventPattern(topicName, eventName) {
 			topic := value.(*Topic)
-			topicErrors := topic.Trigger(NewBaseEvent(topicName, payload))
+			event := NewBaseEvent(topicName, payload)
+			topicErrors := topic.Trigger(event)
 			for _, err := range topicErrors {
 				if m.errorHandler != nil {
-					err = m.errorHandler(err)
+					err = m.errorHandler(event, err)
 				}
 				if err != nil {
 					errorHandler(err)
@@ -156,7 +157,7 @@ func (m *MemoryEmitter) EnsureTopic(eventKey string) *Topic {
 	return topic.(*Topic)
 }
 
-func (m *MemoryEmitter) SetErrorHandler(handler func(error) error) {
+func (m *MemoryEmitter) SetErrorHandler(handler func(Event, error) error) {
 	if handler != nil {
 		m.errorHandler = handler
 	}

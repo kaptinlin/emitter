@@ -10,7 +10,7 @@ import (
 // EmitterOption defines a function type for Emitter configuration options.
 type EmitterOption func(Emitter)
 
-var DefaultErrorHandler = func(err error) error {
+var DefaultErrorHandler = func(event Event, err error) error {
 	return err
 }
 
@@ -31,7 +31,7 @@ var DefaultPanicHandler = func(p interface{}) {
 }
 
 // WithErrorHandler sets a custom error handler for an Emitter.
-func WithErrorHandler(errHandler func(error) error) EmitterOption {
+func WithErrorHandler(errHandler func(Event, error) error) EmitterOption {
 	return func(m Emitter) {
 		m.SetErrorHandler(errHandler)
 	}

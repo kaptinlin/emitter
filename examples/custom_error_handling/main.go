@@ -8,9 +8,9 @@ import (
 )
 
 // CustomErrorHandler logs and handles errors that occur during event processing.
-func CustomErrorHandler(err error) error {
+func CustomErrorHandler(event emitter.Event, err error) error {
 	// Log the error with additional context or send it to an error tracking service
-	log.Printf("An error occurred during event processing: %v", err)
+	log.Printf("Error processing event: %s with payload: %v - error: %s\n", event.Topic(), event.Payload(), err.Error())
 
 	// Here you can decide whether to return the error or handle it so that
 	// the emitter considers it resolved.

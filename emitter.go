@@ -27,7 +27,7 @@ type Emitter interface {
 	EnsureTopic(topicName string) *Topic
 
 	// SetErrorHandler assigns a custom error handler function for the Emitter.
-	SetErrorHandler(func(error) error)
+	SetErrorHandler(func(Event, error) error)
 
 	// SetIDGenerator assigns a function that generates a unique ID string for new listeners.
 	SetIDGenerator(func() string)
