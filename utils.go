@@ -9,8 +9,8 @@ var (
 	MultiWildcard  = "**"
 )
 
-// matchEventPattern checks if the given subject matches the pattern with wildcards.
-func matchEventPattern(pattern, subject string) bool {
+// matchTopicPattern checks if the given subject matches the pattern with wildcards.
+func matchTopicPattern(pattern, subject string) bool {
 	// Special case: single wildcard matches an empty string
 	if pattern == SingleWildcard && subject == "" {
 		return true

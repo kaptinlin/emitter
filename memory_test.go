@@ -214,19 +214,18 @@ func TestWildcardSubscriptionAndEmiting(t *testing.T) {
 
 	receivedEvents := new(sync.Map) // A concurrent map to store received events.
 
-	// Mock listener that records the event topic it receives.
-	listener := func(e Event) error {
-		// Record the event in the receivedEvents map.
-		eventPayload := e.Payload().(string)
-		t.Logf("Listener received event on topic: %s with payload: %s", e.Topic(), eventPayload)
-		payloadEvents, _ := receivedEvents.LoadOrStore(eventPayload, new(sync.Map))
-		payloadEvents.(*sync.Map).Store(e.Topic(), struct{}{})
-		return nil
-	}
-
 	// On the mock listener to all topics.
 	for _, topic := range topics {
-		_, err := emitter.On(topic, listener)
+		topicName := topic
+		_, err := emitter.On(topicName, func(e Event) error {
+			// Record the event in the receivedEvents map.
+			eventPayload := e.Payload().(string)
+			t.Logf("Listener received event on topic: %s with payload: %s", topicName, eventPayload)
+			payloadEvents, _ := receivedEvents.LoadOrStore(eventPayload, new(sync.Map))
+			payloadEvents.(*sync.Map).Store(topicName, struct{}{})
+
+			return nil
+		})
 		if err != nil {
 			t.Fatalf("Failed to subscribe to topic %s: %s", topic, err)
 		}

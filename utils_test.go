@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-func TestMatchEventPattern(t *testing.T) {
+func TestMatchTopicPattern(t *testing.T) {
 	tests := []struct {
 		pattern string
 		subject string
@@ -56,8 +56,8 @@ func TestMatchEventPattern(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.pattern+"_"+tt.subject, func(t *testing.T) {
-			if got := matchEventPattern(tt.pattern, tt.subject); got != tt.want {
-				t.Errorf("matchEventPattern(%q, %q) = %v, want %v", tt.pattern, tt.subject, got, tt.want)
+			if got := matchTopicPattern(tt.pattern, tt.subject); got != tt.want {
+				t.Errorf("matchTopicPattern(%q, %q) = %v, want %v", tt.pattern, tt.subject, got, tt.want)
 			}
 		})
 	}

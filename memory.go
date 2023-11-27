@@ -115,18 +115,18 @@ func (m *MemoryEmitter) EmitSync(eventName string, payload interface{}) []error 
 
 // handleEvents is an internal method that processes an event and notifies all
 // registered listeners. It takes care of error handling and panic recovery.
-func (m *MemoryEmitter) handleEvents(eventName string, payload interface{}, errorHandler func(error)) {
+func (m *MemoryEmitter) handleEvents(topicName string, payload interface{}, errorHandler func(error)) {
 	defer func() {
 		if r := recover(); r != nil && m.panicHandler != nil {
 			m.panicHandler(r)
 		}
 	}()
 
+	event := NewBaseEvent(topicName, payload)
 	m.topics.Range(func(key, value interface{}) bool {
-		topicName := key.(string)
-		if matchEventPattern(topicName, eventName) {
+		topicPattern := key.(string)
+		if matchTopicPattern(topicPattern, topicName) {
 			topic := value.(*Topic)
-			event := NewBaseEvent(topicName, payload)
 			topicErrors := topic.Trigger(event)
 			for _, err := range topicErrors {
 				if m.errorHandler != nil {
@@ -142,18 +142,18 @@ func (m *MemoryEmitter) handleEvents(eventName string, payload interface{}, erro
 }
 
 // GetTopic retrieves a topic by its name. If the topic does not exist, it returns an error.
-func (m *MemoryEmitter) GetTopic(eventKey string) (*Topic, error) {
-	topic, ok := m.topics.Load(eventKey)
+func (m *MemoryEmitter) GetTopic(topicName string) (*Topic, error) {
+	topic, ok := m.topics.Load(topicName)
 	if !ok {
-		return nil, fmt.Errorf("%w: unable to find topic '%s'", ErrTopicNotFound, eventKey)
+		return nil, fmt.Errorf("%w: unable to find topic '%s'", ErrTopicNotFound, topicName)
 	}
 	return topic.(*Topic), nil
 }
 
 // EnsureTopic retrieves or creates a new topic by its name. If the topic does not
 // exist, it is created and returned. This ensures that a topic is always available.
-func (m *MemoryEmitter) EnsureTopic(eventKey string) *Topic {
-	topic, _ := m.topics.LoadOrStore(eventKey, NewTopic())
+func (m *MemoryEmitter) EnsureTopic(topicName string) *Topic {
+	topic, _ := m.topics.LoadOrStore(topicName, NewTopic())
 	return topic.(*Topic)
 }
 
