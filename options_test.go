@@ -16,7 +16,7 @@ func TestWithErrorHandler(t *testing.T) {
 
 	// Define a custom error handler that sets handlerCalled to true.
 	customErrorHandler := func(event Event, err error) error {
-		if err == customError {
+		if errors.Is(err, customError) {
 			handlerCalled = true
 			t.Logf("Custom error handler called with event: %s and error: %s", event.Topic(), err.Error())
 		}
@@ -57,7 +57,7 @@ func TestWithErrorHandlerAsync(t *testing.T) {
 	customErrorHandler := func(event Event, err error) error {
 		handlerMutex.Lock()
 		defer handlerMutex.Unlock()
-		if err == customError {
+		if errors.Is(err, customError) {
 			handlerCalled = true
 		}
 		return nil // Assume the error is handled and return nil.

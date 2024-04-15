@@ -233,7 +233,7 @@ func TestWildcardSubscriptionAndEmiting(t *testing.T) {
 
 	// Emit events to all topics and check if the listeners are notified.
 	for eventKey := range expectedMatches {
-		t.Logf("Emiting event: %s", eventKey)
+		t.Logf("Emitting event: %s", eventKey)
 		emitter.Emit(eventKey, eventKey) // Use the eventKey as the payload for identification.
 	}
 
