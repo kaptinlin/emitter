@@ -1,11 +1,15 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 
 	"github.com/kaptinlin/emitter"
 )
+
+// ErrSimulatedListener is a static error for demonstration purposes.
+var ErrSimulatedListener = errors.New("simulated error in listener")
 
 // CustomErrorHandler logs and handles errors that occur during event processing.
 func CustomErrorHandler(event emitter.Event, err error) error {
@@ -25,11 +29,14 @@ func main() {
 	// Define an event listener that intentionally causes an error
 	listener := func(evt emitter.Event) error {
 		// Simulate an error
-		return fmt.Errorf("simulated error in listener for event: %s", evt.Topic())
+		return fmt.Errorf("simulated error in listener for event: %w", ErrSimulatedListener)
 	}
 
 	// Subscribe the listener to a topic
-	e.On("user.created", listener)
+	_, err := e.On("user.created", listener)
+	if err != nil {
+		log.Fatalf("Failed to subscribe listener: %v", err)
+	}
 
 	// Emit an event which will cause the listener to error
 	errChan := e.Emit("user.created", "Jane Doe")

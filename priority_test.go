@@ -17,13 +17,16 @@ func TestPriorityOrdering(t *testing.T) {
 	// Helper function to subscribe to the emitter with synchronization.
 	subscribeWithPriority := func(priority Priority) {
 		wg.Add(1) // Increment the WaitGroup counter.
-		em.On(topic, func(e Event) error {
+		_, err := em.On(topic, func(e Event) error {
 			defer wg.Done() // Decrement the counter when the function completes.
 			mu.Lock()       // Lock the mutex to safely append to callOrder.
 			callOrder = append(callOrder, priority)
 			mu.Unlock() // Unlock the mutex after appending.
 			return nil
 		}, WithPriority(priority))
+		if err != nil {
+			t.Fatalf("Error adding listener with priority %v: %v", priority, err)
+		}
 	}
 
 	// Set up listeners with different priorities.
@@ -75,9 +78,15 @@ func TestEmitSyncWithAbort(t *testing.T) {
 	}
 
 	// Subscribe the listeners to the "testTopic".
-	emitter.On("testTopic", lowPriorityListener, WithPriority(Low)) // This should not be called.
-	emitter.On("testTopic", abortingListener, WithPriority(Normal)) // This listener will abort the event.
-	emitter.On("testTopic", highPriorityListener, WithPriority(High))
+	if _, err := emitter.On("testTopic", lowPriorityListener, WithPriority(Low)); err != nil {
+		t.Fatalf("Error adding low priority listener: %v", err)
+	}
+	if _, err := emitter.On("testTopic", abortingListener, WithPriority(Normal)); err != nil {
+		t.Fatalf("Error adding aborting listener: %v", err)
+	}
+	if _, err := emitter.On("testTopic", highPriorityListener, WithPriority(High)); err != nil {
+		t.Fatalf("Error adding high priority listener: %v", err)
+	}
 
 	// Emit the event synchronously.
 	emitter.EmitSync("testTopic", "testPayload")
@@ -107,9 +116,15 @@ func TestEmitWithAbort(t *testing.T) {
 	}
 
 	// Subscribe the listeners to the "testTopic".
-	emitter.On("testTopic", lowPriorityListener, WithPriority(Low)) // This should not be called.
-	emitter.On("testTopic", abortingListener, WithPriority(Normal)) // This listener will abort the event.
-	emitter.On("testTopic", highPriorityListener, WithPriority(High))
+	if _, err := emitter.On("testTopic", lowPriorityListener, WithPriority(Low)); err != nil {
+		t.Fatalf("Error adding low priority listener: %v", err)
+	}
+	if _, err := emitter.On("testTopic", abortingListener, WithPriority(Normal)); err != nil {
+		t.Fatalf("Error adding aborting listener: %v", err)
+	}
+	if _, err := emitter.On("testTopic", highPriorityListener, WithPriority(High)); err != nil {
+		t.Fatalf("Error adding high priority listener: %v", err)
+	}
 
 	// Emit the event asynchronously.
 	errChan := emitter.Emit("testTopic", "testPayload")

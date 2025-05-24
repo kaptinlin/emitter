@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/kaptinlin/emitter"
 )
@@ -24,7 +25,10 @@ func main() {
 	}
 
 	// Subscribe the listener to a topic
-	e.On("user.created", listener)
+	_, err := e.On("user.created", listener)
+	if err != nil {
+		log.Fatalf("Failed to subscribe listener: %v", err)
+	}
 
 	// Emit an event which will cause the listener to panic
 	// Normally, you would check for errors and handle the error channel, but for the sake of this example, it's omitted.

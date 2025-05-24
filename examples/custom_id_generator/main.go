@@ -9,9 +9,7 @@ import (
 
 func main() {
 	// Custom ID generator using UUID v4
-	uuidGenerator := func() string {
-		return uuid.NewString()
-	}
+	uuidGenerator := uuid.NewString
 
 	// Create a new emitter instance with the custom ID generator
 	e := emitter.NewMemoryEmitter(emitter.WithIDGenerator(uuidGenerator))

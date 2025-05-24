@@ -6,13 +6,17 @@ import (
 	"testing"
 )
 
+var (
+	errTestCustomError = errors.New("custom error")
+)
+
 // TestWithErrorHandler tests that the custom error handler is called on error.
 func TestWithErrorHandler(t *testing.T) {
 	// Define a variable to determine if the custom error handler was called.
 	var handlerCalled bool
 
 	// Define a custom error to be returned by a listener.
-	customError := errors.New("custom error")
+	customError := errTestCustomError
 
 	// Define a custom error handler that sets handlerCalled to true.
 	customErrorHandler := func(event Event, err error) error {
@@ -51,7 +55,7 @@ func TestWithErrorHandlerAsync(t *testing.T) {
 	var handlerMutex sync.Mutex // To safely update handlerCalled from different goroutines
 
 	// Define a custom error to be returned by a listener.
-	customError := errors.New("custom error")
+	customError := errTestCustomError
 
 	// Define a custom error handler that sets handlerCalled to true.
 	customErrorHandler := func(event Event, err error) error {
@@ -89,10 +93,8 @@ func TestWithErrorHandlerAsync(t *testing.T) {
 
 	// Check if the custom error handler was called.
 	handlerMutex.Lock()
-	wasHandlerCalled := handlerCalled
-	handlerMutex.Unlock()
-
-	if !wasHandlerCalled {
+	defer handlerMutex.Unlock()
+	if !handlerCalled {
 		t.Fatalf("Custom error handler was not called on listener error")
 	}
 }
@@ -177,10 +179,8 @@ func TestWithPanicHandlerAsync(t *testing.T) {
 
 	// Verify that the custom panic handler was invoked
 	panicHandlerMutex.Lock()
-	wasPanicHandlerInvoked := panicHandlerInvoked
-	panicHandlerMutex.Unlock()
-
-	if !wasPanicHandlerInvoked {
+	defer panicHandlerMutex.Unlock()
+	if !panicHandlerInvoked {
 		t.Fatalf("Custom panic handler was not called on listener panic")
 	}
 }

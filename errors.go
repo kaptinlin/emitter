@@ -1,6 +1,8 @@
 package emitter
 
-import "errors"
+import (
+	"errors"
+)
 
 // Initialization Errors relate to the setup of listeners and topics.
 var (

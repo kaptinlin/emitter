@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/kaptinlin/emitter"
@@ -49,9 +50,18 @@ func main() {
 	}
 
 	// Subscribe listeners with specified priorities
-	e.On("order.created", validateOrderListener, emitter.WithPriority(emitter.Highest))
-	e.On("order.created", processPaymentListener, emitter.WithPriority(emitter.Normal))
-	e.On("order.created", sendConfirmationEmailListener, emitter.WithPriority(emitter.Low))
+	_, err := e.On("order.created", validateOrderListener, emitter.WithPriority(emitter.Highest))
+	if err != nil {
+		log.Fatalf("Failed to subscribe validate order listener: %v", err)
+	}
+	_, err = e.On("order.created", processPaymentListener, emitter.WithPriority(emitter.Normal))
+	if err != nil {
+		log.Fatalf("Failed to subscribe process payment listener: %v", err)
+	}
+	_, err = e.On("order.created", sendConfirmationEmailListener, emitter.WithPriority(emitter.Low))
+	if err != nil {
+		log.Fatalf("Failed to subscribe send confirmation email listener: %v", err)
+	}
 
 	// Emit events for order creation
 	fmt.Println("Emitting event for order creation...")

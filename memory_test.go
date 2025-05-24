@@ -7,6 +7,10 @@ import (
 	"time"
 )
 
+var (
+	errTestListenerError = errors.New("listener error")
+)
+
 // TestNewMemoryEmitter tests the creation of a new MemoryEmitter.
 func TestNewMemoryEmitter(t *testing.T) {
 	emitter := NewMemoryEmitter()
@@ -80,7 +84,7 @@ func TestEmitAsyncFailure(t *testing.T) {
 	listener := func(e Event) error {
 		// Simulate some work.
 		time.Sleep(10 * time.Millisecond)
-		return errors.New("listener error")
+		return errTestListenerError
 	}
 
 	// Subscribe the listener to the "testTopic".
@@ -120,7 +124,13 @@ func TestEmitSyncSuccess(t *testing.T) {
 		t.Fatalf("On() failed with error: %v", err)
 	}
 
-	emitter.Emit("testTopic", "testPayload") // Emit the event.
+	// Emit the event and ignore the error channel for this test
+	go func() {
+		errChan := emitter.Emit("testTopic", "testPayload")
+		for range errChan {
+			// Consume errors to prevent goroutine leak
+		}
+	}()
 
 	// Wait for the listener to handle the event or timeout after a specific duration.
 	select {
@@ -139,7 +149,7 @@ func TestEmitSyncFailure(t *testing.T) {
 
 	// Create a listener that returns an error.
 	listener := func(e Event) error {
-		return errors.New("listener error")
+		return errTestListenerError
 	}
 
 	// Subscribe the listener to the "testTopic".
@@ -234,7 +244,13 @@ func TestWildcardSubscriptionAndEmiting(t *testing.T) {
 	// Emit events to all topics and check if the listeners are notified.
 	for eventKey := range expectedMatches {
 		t.Logf("Emitting event: %s", eventKey)
-		emitter.Emit(eventKey, eventKey) // Use the eventKey as the payload for identification.
+		// Emit the event and consume the error channel
+		go func(key string) {
+			errChan := emitter.Emit(key, key)
+			for range errChan {
+				// Consume errors to prevent goroutine leak
+			}
+		}(eventKey)
 	}
 
 	// Allow some time for the events to be processed asynchronously.
@@ -243,7 +259,7 @@ func TestWildcardSubscriptionAndEmiting(t *testing.T) {
 	// Verify that the correct listeners were notified.
 	for eventKey, expectedTopics := range expectedMatches {
 		if topics, ok := receivedEvents.Load(eventKey); ok {
-			receivedTopics := make([]string, 0)
+			var receivedTopics []string
 			topics.(*sync.Map).Range(func(key, value interface{}) bool {
 				receivedTopic := key.(string)
 				receivedTopics = append(receivedTopics, receivedTopic)
@@ -266,19 +282,23 @@ func TestMemoryEmitterClose(t *testing.T) {
 	// Set up topics and listeners
 	topic1 := "topic1"
 	listener1 := func(e Event) error { return nil }
-	emitter.On(topic1, listener1)
+	_, err := emitter.On(topic1, listener1)
+	if err != nil {
+		t.Fatalf("On() failed with error: %v", err)
+	}
 
 	topic2 := "topic2"
 	listener2 := func(e Event) error { return nil }
-	emitter.On(topic2, listener2)
+	if _, err := emitter.On(topic2, listener2); err != nil {
+		t.Fatalf("On() failed with error: %v", err)
+	}
 
 	// Use a Pool
 	pool := NewPondPool(10, 1000)
 	emitter.SetPool(pool)
 
 	// Close the emitter
-	err := emitter.Close()
-	if err != nil {
+	if err := emitter.Close(); err != nil {
 		t.Errorf("Close() should not return an error: %v", err)
 	}
 

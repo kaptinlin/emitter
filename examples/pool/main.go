@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/kaptinlin/emitter"
@@ -24,7 +25,10 @@ func main() {
 	}
 
 	// Subscribe the listener to a topic
-	e.On("user.signup", timeConsumingListener)
+	_, err := e.On("user.signup", timeConsumingListener)
+	if err != nil {
+		log.Fatalf("Failed to subscribe listener: %v", err)
+	}
 
 	// Emit several events concurrently
 	for i := 0; i < 10; i++ {

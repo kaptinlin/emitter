@@ -2,15 +2,20 @@ package emitter
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 	"testing"
+)
+
+var (
+	errListenerBase = errors.New("listener error base")
 )
 
 // mockListener simulates a listener function for testing.
 func mockListener(id string, shouldError bool) Listener {
 	return func(e Event) error {
 		if shouldError {
-			return errors.New("listener error " + id)
+			return fmt.Errorf("listener error %s: %w", id, errListenerBase)
 		}
 		return nil
 	}
@@ -40,12 +45,16 @@ func TestAddRemoveListener(t *testing.T) {
 		t.Error("AddListener() failed to add listener 2")
 	}
 
-	topic.RemoveListener(id1)
+	if err := topic.RemoveListener(id1); err != nil {
+		t.Errorf("RemoveListener() failed to remove listener 1: %v", err)
+	}
 	if len(topic.listeners) != 1 {
 		t.Errorf("RemoveListener() failed to remove listener 1, remaining listeners: %d", len(topic.listeners))
 	}
 
-	topic.RemoveListener(id2)
+	if err := topic.RemoveListener(id2); err != nil {
+		t.Errorf("RemoveListener() failed to remove listener 2: %v", err)
+	}
 	if len(topic.listeners) != 0 {
 		t.Errorf("RemoveListener() failed to remove listener 2, remaining listeners: %d", len(topic.listeners))
 	}
@@ -72,8 +81,8 @@ func TestTriggerListeners(t *testing.T) {
 		errors := topic.Trigger(event)
 		if len(errors) != 1 {
 			t.Errorf("Trigger() should return exactly 1 error, got: %d", len(errors))
-		} else if errors[0].Error() != "listener error 2" {
-			t.Errorf("Trigger() should return 'listener error 2', got: %s", errors[0].Error())
+		} else if errors[0].Error() != "listener error 2: listener error base" {
+			t.Errorf("Trigger() should return 'listener error 2: listener error base', got: %s", errors[0].Error())
 		}
 	}()
 

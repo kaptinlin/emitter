@@ -67,7 +67,7 @@ func TestEmitMultipleEventsWithPool(t *testing.T) {
 	var processingError error
 
 	// Add an event listener to handle "testEvent" and increment the processedEvents count.
-	emitter.On("testEvent", func(event Event) error {
+	_, err := emitter.On("testEvent", func(event Event) error {
 		// Simulate some processing.
 		// For testing, we just sleep for a short time to simulate work.
 		// In a real scenario, you should replace this with your actual event processing logic.
@@ -80,6 +80,9 @@ func TestEmitMultipleEventsWithPool(t *testing.T) {
 
 		return nil
 	})
+	if err != nil {
+		t.Fatalf("Error adding listener: %v", err)
+	}
 
 	// Emit multiple events concurrently.
 	for i := 0; i < numConcurrentEvents; i++ {
