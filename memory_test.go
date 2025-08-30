@@ -207,7 +207,29 @@ func TestEnsureTopic(t *testing.T) {
 }
 
 func TestWildcardSubscriptionAndEmiting(t *testing.T) {
-	emitter := NewMemoryEmitter()
+	t.Parallel()
+
+	testCases := []struct {
+		name            string
+		event           string
+		expectedMatches []string
+	}{
+		{
+			name:            "full_match",
+			event:           "event.some.thing.run",
+			expectedMatches: []string{"event.some.*.*", "event.some.*.run", "event.some.**", "**.thing.run"},
+		},
+		{
+			name:            "partial_match",
+			event:           "event.some.thing.do",
+			expectedMatches: []string{"event.some.*.*", "event.some.**"},
+		},
+		{
+			name:            "simple_match",
+			event:           "event.some.thing",
+			expectedMatches: []string{"event.some.**"},
+		},
+	}
 
 	topics := []string{
 		"event.some.*.*",
@@ -216,63 +238,72 @@ func TestWildcardSubscriptionAndEmiting(t *testing.T) {
 		"**.thing.run",
 	}
 
-	expectedMatches := map[string][]string{
-		"event.some.thing.run": {"event.some.*.*", "event.some.*.run", "event.some.**", "**.thing.run"},
-		"event.some.thing.do":  {"event.some.*.*", "event.some.**"},
-		"event.some.thing":     {"event.some.**"},
-	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-	receivedEvents := new(sync.Map) // A concurrent map to store received events.
+			emitter := NewMemoryEmitter()
+			receivedEvents := make(map[string]bool)
+			var mu sync.Mutex
+			var wg sync.WaitGroup
 
-	// On the mock listener to all topics.
-	for _, topic := range topics {
-		topicName := topic
-		_, err := emitter.On(topicName, func(e Event) error {
-			// Record the event in the receivedEvents map.
-			eventPayload := e.Payload().(string)
-			t.Logf("Listener received event on topic: %s with payload: %s", topicName, eventPayload)
-			payloadEvents, _ := receivedEvents.LoadOrStore(eventPayload, new(sync.Map))
-			payloadEvents.(*sync.Map).Store(topicName, struct{}{})
-
-			return nil
-		})
-		if err != nil {
-			t.Fatalf("Failed to subscribe to topic %s: %s", topic, err)
-		}
-	}
-
-	// Emit events to all topics and check if the listeners are notified.
-	for eventKey := range expectedMatches {
-		t.Logf("Emitting event: %s", eventKey)
-		// Emit the event and consume the error channel
-		go func(key string) {
-			errChan := emitter.Emit(key, key)
-			for range errChan {
-				// Consume errors to prevent goroutine leak
-			}
-		}(eventKey)
-	}
-
-	// Allow some time for the events to be processed asynchronously.
-	time.Sleep(1 * time.Second) // In real tests, use synchronization primitives instead of Sleep.
-
-	// Verify that the correct listeners were notified.
-	for eventKey, expectedTopics := range expectedMatches {
-		if topics, ok := receivedEvents.Load(eventKey); ok {
-			var receivedTopics []string
-			topics.(*sync.Map).Range(func(key, value interface{}) bool {
-				receivedTopic := key.(string)
-				receivedTopics = append(receivedTopics, receivedTopic)
-				return true
-			})
-			for _, expectedTopic := range expectedTopics {
-				if !contains(receivedTopics, expectedTopic) {
-					t.Errorf("Expected topic %s to be notified for event %s, but it was not", expectedTopic, eventKey)
+			// Subscribe to all topics with listeners that track received events
+			for _, topicName := range topics {
+				name := topicName // Capture the variable for the closure
+				_, err := emitter.On(name, func(e Event) error {
+					mu.Lock()
+					receivedEvents[name] = true
+					mu.Unlock()
+					wg.Done()
+					return nil
+				})
+				if err != nil {
+					t.Fatalf("Failed to subscribe to topic %s: %v", name, err)
 				}
 			}
-		} else {
-			t.Errorf("No events received for eventKey %s", eventKey)
-		}
+
+			// Set up wait group to wait for expected listeners
+			wg.Add(len(tc.expectedMatches))
+
+			// Emit the event
+			errChan := emitter.Emit(tc.event, tc.event)
+			go func() {
+				for range errChan {
+					// Consume errors to prevent goroutine leak
+				}
+			}()
+
+			// Wait for all expected listeners to be called or timeout
+			done := make(chan struct{})
+			go func() {
+				wg.Wait()
+				close(done)
+			}()
+
+			select {
+			case <-done:
+				// All expected listeners were called
+			case <-time.After(5 * time.Second):
+				t.Fatal("Test timed out waiting for listeners to be called")
+			}
+
+			// Verify that the correct topics were notified
+			mu.Lock()
+			defer mu.Unlock()
+
+			for _, expectedTopic := range tc.expectedMatches {
+				if !receivedEvents[expectedTopic] {
+					t.Errorf("Expected topic %s to be notified for event %s, but it was not", expectedTopic, tc.event)
+				}
+			}
+
+			// Verify no unexpected topics were notified
+			for topic := range receivedEvents {
+				if !contains(tc.expectedMatches, topic) {
+					t.Errorf("Topic %s was unexpectedly notified for event %s", topic, tc.event)
+				}
+			}
+		})
 	}
 }
 

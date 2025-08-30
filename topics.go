@@ -1,6 +1,7 @@
 package emitter
 
 import (
+	"slices"
 	"sort"
 	"sync"
 )
@@ -35,12 +36,9 @@ func (t *Topic) addSortedListenerID(id string, priority Priority) {
 
 // removeSortedListenerID removes a listener ID from the sorted slice.
 func (t *Topic) removeSortedListenerID(id string) {
-	for i, listenerID := range t.sortedListenerIDs {
-		if listenerID == id {
-			t.sortedListenerIDs = append(t.sortedListenerIDs[:i], t.sortedListenerIDs[i+1:]...)
-			break
-		}
-	}
+	t.sortedListenerIDs = slices.DeleteFunc(t.sortedListenerIDs, func(listenerID string) bool {
+		return listenerID == id
+	})
 }
 
 // AddListener adds a new listener to the topic with a specified priority and returns an identifier for the listener.

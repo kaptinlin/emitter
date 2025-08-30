@@ -1,23 +1,32 @@
-# Emitter: A Go Event Emission Library
+# Emitter: A Modern Go Event Emission Library
 
-Emitter is a robust Go library that simplifies event management in applications. Offering a straightforward interface for event subscription and handling, it is designed for performance and thread safety.
+[![Go Report Card](https://goreportcard.com/badge/github.com/kaptinlin/emitter)](https://goreportcard.com/report/github.com/kaptinlin/emitter)
+[![Go Version](https://img.shields.io/badge/Go-1.24+-blue.svg)](https://golang.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## Features
+Emitter is a high-performance, thread-safe Go library for event management that leverages modern Go features (1.24+). Built with atomic operations and optimized data structures for maximum performance and reliability.
 
-- **In-Memory Management**: Host and manage events internally without external dependencies.
-- **Listener Prioritization**: Specify invocation order for fine-grained control over event handling.
-- **Concurrent Processing**: Utilize goroutines for handling events in parallel.
-- **Wildcard Subscriptions**: Employ pattern matching for event subscriptions.
-- **Customization**: Configure with custom handlers for errors, IDs, panics, and more.
-- **Thread Safety**: Safely operate in concurrent environments.
+## ✨ Features
 
-## Installation
+- 🚀 **High Performance**: Built with `atomic.Pointer` and modern Go optimizations
+- 🧠 **In-Memory Management**: Zero external dependencies, fully self-contained
+- 📋 **Priority-Based Processing**: Fine-grained control over listener execution order
+- ⚡ **Concurrent & Parallel**: Goroutine pools and lock-free operations
+- 🎯 **Smart Pattern Matching**: Wildcard subscriptions with `*` and `**` support
+- 🛠️ **Highly Customizable**: Custom error handlers, ID generators, panic recovery
+- 🔒 **Thread-Safe**: Designed for high-concurrency environments
+- 🧪 **Battle-Tested**: Comprehensive test suite including fuzz testing
+- 📦 **Go 1.24+ Ready**: Uses latest Go features for optimal performance
+
+## 📦 Installation
+
+**Requirements:** Go 1.24 or higher
 
 ```sh
 go get -u github.com/kaptinlin/emitter
 ```
 
-## Quick Start
+## 🚀 Quick Start
 
 ```go
 package main
@@ -37,7 +46,7 @@ func main() {
 }
 ```
 
-## Configuration
+## ⚙️ Configuration
 
 Customize Emitter with a variety of options:
 
@@ -56,9 +65,10 @@ e := emitter.NewMemoryEmitter(
 | `WithPool(pool emitter.Pool)`                  | Assign a goroutine pool for concurrent event handling.       |
 | `WithErrorHandler(handler func(emitter.Event, error) error)` | Set a custom error handler for the emitter that receives an event and an error. |
 | `WithIDGenerator(generator func() string)`     | Define a function for generating unique listener IDs.        |
-| `WithPanicHandler(handler func(interface{}))`  | Implement a panic recovery strategy.                         |
+| `WithPanicHandler(handler func(any))`          | Implement a panic recovery strategy.                         |
+| `WithErrChanBufferSize(size int)`              | Set the buffer size for error channels in async operations.  |
 
-## Wildcard Event Subscription
+## 🎯 Wildcard Event Subscription
 
 Pattern-match event topics with wildcards:
 
@@ -86,7 +96,7 @@ e.Emit("user.signup", "John Doe")
 // Use synchronization instead of sleep in production.
 ```
 
-## Aborting Event Propagation
+## ⛔ Aborting Event Propagation
 
 Stop event propagation using `SetAborted`:
 
@@ -107,7 +117,7 @@ e.Emit("order.processed", "Order data")
 
 Abort event handling early based on custom logic.
 
-## Examples
+## 📚 Examples
 
 - [Managing Concurrency](#managing-concurrency-with-withpool)
 - [Custom Error Handling](#custom-error-handling-with-witherrorhandler)
@@ -115,7 +125,7 @@ Abort event handling early based on custom logic.
 - [ID Generation](#generating-unique-ids-with-withidgenerator)
 - [Panic Recovery](#handling-panics-gracefully-with-withpanichandler)
 
-### Managing Concurrency with `WithPool`
+### ⚡ Managing Concurrency with `WithPool`
 
 Delegate concurrency management to a custom goroutine pool using the `WithPool` option:
 
@@ -140,7 +150,7 @@ func main() {
 
 This configuration employs 10 worker goroutines, optimizing task handling.
 
-### Custom Error Handling with `WithErrorHandler`
+### 🚨 Custom Error Handling with `WithErrorHandler`
 
 Enhance error visibility by defining a custom error handler:
 
@@ -168,7 +178,7 @@ func main() {
 
 With `logErrorHandler`, all errors are logged for review and action.
 
-### Prioritizing Listeners with `WithPriority`
+### 📊 Prioritizing Listeners with `WithPriority`
 
 Control the invocation order of event listeners:
 
@@ -206,7 +216,7 @@ func main() {
 
 Listeners with higher priority are notified first when an event occurs.
 
-### Generating Unique IDs with `WithIDGenerator`
+### 🆔 Generating Unique IDs with `WithIDGenerator`
 
 Implement custom ID generation for listener tracking:
 
@@ -233,7 +243,7 @@ func main() {
 
 Listeners are now identified by a unique UUID, providing better traceability.
 
-### Handling Panics Gracefully with `WithPanicHandler`
+### 🛡️ Handling Panics Gracefully with `WithPanicHandler`
 
 Safeguard your application from unexpected panics during event handling:
 
@@ -247,7 +257,7 @@ import (
 
 func main() {
 	// Define a panic handler that logs the occurrence
-	logPanicHandler := func(p interface{}) {
+	logPanicHandler := func(p any) {
 		log.Printf("Panic recovered: %v", p)
 		// Insert additional logic for panic recovery here
 	}
@@ -261,10 +271,72 @@ func main() {
 
 This handler ensures that panics are logged and managed without disrupting your service.
 
-## Contributing
+## 🔧 Development Commands
 
-Contributions are welcome! Check out our [Contributing Guidelines](CONTRIBUTING.md) to get started.
+```bash
+# Run all tests with race detection
+make test
 
-## License
+# Run fuzz tests
+make test-fuzz
+
+# Lint code
+make lint
+
+# Check for shadowed variables
+make vet-shadow
+
+# Clean build artifacts
+make clean
+```
+
+## ⚡ Performance Features
+
+- **Lock-Free Operations**: Uses `atomic.Pointer` for handler storage
+- **Efficient Slice Operations**: Leverages Go 1.21+ `slices` package
+- **Zero-Copy Event Handling**: Minimal memory allocations
+- **Optimized Pattern Matching**: Fast wildcard resolution
+- **Concurrent-Safe**: Designed for high-throughput scenarios
+
+## 🧪 Testing
+
+This library includes comprehensive testing:
+
+- **Unit Tests**: Full coverage with race detection
+- **Parallel Tests**: Concurrent test execution
+- **Fuzz Testing**: Automated edge case discovery
+- **Integration Tests**: Real-world scenario validation
+
+```bash
+# Run all tests
+go test -race ./...
+
+# Run fuzz tests
+go test -fuzz=FuzzMatchTopicPattern -fuzztime=30s
+```
+
+## 🤝 Contributing
+
+We welcome contributions! Here's how to get started:
+
+1. **Fork** the repository
+2. **Clone** your fork: `git clone https://github.com/yourusername/emitter.git`
+3. **Create** a feature branch: `git checkout -b feature/amazing-feature`
+4. **Make** your changes and add tests
+5. **Run** tests: `make test`
+6. **Commit** your changes: `git commit -m 'Add amazing feature'`
+7. **Push** to the branch: `git push origin feature/amazing-feature`
+8. **Open** a Pull Request
+
+Please ensure your code:
+- Follows Go conventions and passes `make lint`
+- Includes appropriate tests
+- Updates documentation as needed
+
+## 📄 License
 
 Emitter is licensed under the [MIT License](LICENSE.md). Feel free to use, modify, and distribute the code as you see fit.
+
+---
+
+**Made with ❤️ for the Go community**

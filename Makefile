@@ -19,6 +19,16 @@ clean:
 test:
 	@$(foreach mod,$(MODULE_DIRS),(cd $(mod) && go test -race ./...) &&) true
 
+.PHONY: test-fuzz
+test-fuzz:
+	@echo "[test] running fuzz tests"
+	@$(foreach mod,$(MODULE_DIRS),(cd $(mod) && go test -fuzz=FuzzMatchTopicPattern -fuzztime=10s ./...) &&) true
+
+.PHONY: vet-shadow
+vet-shadow:
+	@echo "[vet] checking for shadowed variables"
+	@$(foreach mod,$(MODULE_DIRS),(cd $(mod) && go vet -shadow ./...) &&) true
+
 .PHONY: lint
 lint: golangci-lint tidy-lint
 
