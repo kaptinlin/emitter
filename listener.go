@@ -13,6 +13,14 @@ type ListenerOption func(*listenerItem)
 
 func WithPriority(priority Priority) ListenerOption {
 	return func(item *listenerItem) {
-		item.priority = priority
+		// Validate priority and use boundary values if out of range
+		switch {
+		case priority < Lowest:
+			item.priority = Lowest
+		case priority > Highest:
+			item.priority = Highest
+		default:
+			item.priority = priority
+		}
 	}
 }

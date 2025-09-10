@@ -2,8 +2,9 @@
 PROJECT_ROOT = $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 export GOBIN = $(PROJECT_ROOT)/bin
 
-GOLANGCI_LINT_VERSION := $(shell $(GOBIN)/golangci-lint version --format short 2>/dev/null)
-REQUIRED_GOLANGCI_LINT_VERSION := $(shell cat .golangci.version)
+GOLANGCI_LINT_BINARY := $(GOBIN)/golangci-lint
+GOLANGCI_LINT_VERSION := $(shell $(GOLANGCI_LINT_BINARY) version --format short 2>/dev/null || $(GOLANGCI_LINT_BINARY) version --short 2>/dev/null || echo "not-installed")
+REQUIRED_GOLANGCI_LINT_VERSION := $(shell cat .golangci.version 2>/dev/null || echo "2.4.0")
 
 # Directories containing independent Go modules.
 MODULE_DIRS = .
@@ -12,31 +13,47 @@ MODULE_DIRS = .
 all: lint test
 
 .PHONY: clean
-clean:
+clean: ## Clean build artifacts and caches
+	@echo "[clean] Cleaning build artifacts..."
 	@rm -rf $(GOBIN)
+	@go clean -cache -testcache
 
 .PHONY: test
-test:
-	@$(foreach mod,$(MODULE_DIRS),(cd $(mod) && go test -race ./...) &&) true
+test: ## Run all tests
+	@echo "[test] Running all tests..."
+	@$(foreach mod,$(MODULE_DIRS),(cd $(mod) && go test ./...) &&) true
+
+.PHONY: test-fuzz
+test-fuzz:
+	@echo "[test] running fuzz tests"
+	@$(foreach mod,$(MODULE_DIRS),(cd $(mod) && go test -fuzz=FuzzMatchTopicPattern -fuzztime=10s ./...) &&) true
+
+.PHONY: vet-shadow
+vet-shadow:
+	@echo "[vet] checking for shadowed variables"
+	@$(foreach mod,$(MODULE_DIRS),(cd $(mod) && go vet -shadow ./...) &&) true
 
 .PHONY: lint
 lint: golangci-lint tidy-lint
 
-# Install golangci-lint with the required version in GOBIN if it is not already installed.
 .PHONY: install-golangci-lint
 install-golangci-lint:
-    ifneq ($(GOLANGCI_LINT_VERSION),$(REQUIRED_GOLANGCI_LINT_VERSION))
-		@echo "[lint] installing golangci-lint v$(REQUIRED_GOLANGCI_LINT_VERSION) since current version is \"$(GOLANGCI_LINT_VERSION)\""
-		@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GOBIN) v$(REQUIRED_GOLANGCI_LINT_VERSION)
-    endif
+	@mkdir -p $(GOBIN)
+	@if [ "$(GOLANGCI_LINT_VERSION)" != "$(REQUIRED_GOLANGCI_LINT_VERSION)" ]; then \
+		echo "[lint] Installing golangci-lint v$(REQUIRED_GOLANGCI_LINT_VERSION) (current: $(GOLANGCI_LINT_VERSION))"; \
+		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GOBIN) v$(REQUIRED_GOLANGCI_LINT_VERSION); \
+		echo "[lint] golangci-lint v$(REQUIRED_GOLANGCI_LINT_VERSION) installed successfully"; \
+	else \
+		echo "[lint] golangci-lint v$(REQUIRED_GOLANGCI_LINT_VERSION) already installed"; \
+	fi
 
 .PHONY: golangci-lint
 golangci-lint: install-golangci-lint
-	@echo "[lint] $(shell $(GOBIN)/golangci-lint version)"
+	@echo "[lint] Running $(shell $(GOLANGCI_LINT_BINARY) version)"
 	@$(foreach mod,$(MODULE_DIRS), \
 		(cd $(mod) && \
 		echo "[lint] golangci-lint: $(mod)" && \
-		$(GOBIN)/golangci-lint run --path-prefix $(mod)) &&) true
+		$(GOLANGCI_LINT_BINARY) run --timeout=10m --path-prefix $(mod)) &&) true
 
 .PHONY: tidy-lint
 tidy-lint:

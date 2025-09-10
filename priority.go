@@ -10,3 +10,8 @@ const (
 	High
 	Highest
 )
+
+// IsValid checks if the priority value is within valid range.
+func (p Priority) IsValid() bool {
+	return p >= Lowest && p <= Highest
+}
