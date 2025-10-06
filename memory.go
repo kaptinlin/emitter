@@ -13,7 +13,7 @@ type MemoryEmitter struct {
 	topics            sync.Map                                 // Stores topics with concurrent access support.
 	errorHandler      atomic.Pointer[func(Event, error) error] // Handles errors that occur during event handling.
 	idGenerator       atomic.Pointer[func() string]            // Generates unique IDs for listeners.
-	panicHandler      atomic.Pointer[func(interface{})]        // Handles panics that occur during event handling.
+	panicHandler      atomic.Pointer[func(any)]                // Handles panics that occur during event handling.
 	Pool              Pool                                     // Manages concurrent execution of event handlers.
 	closed            atomic.Bool                              // Indicates whether the emitter is closed.
 	errChanBufferSize int                                      // Size of the buffer for the error channel in Emit.
@@ -74,7 +74,7 @@ func (m *MemoryEmitter) Off(topicName string, listenerID string) error {
 
 // Emit asynchronously dispatches an event to all the subscribers of the event's topic.
 // It returns a channel that will receive any errors encountered during event handling.
-func (m *MemoryEmitter) Emit(eventName string, payload interface{}) <-chan error {
+func (m *MemoryEmitter) Emit(eventName string, payload any) <-chan error {
 	errChan := make(chan error, m.errChanBufferSize)
 
 	// Before starting new goroutine, check if Emitter is closed
@@ -105,7 +105,7 @@ func (m *MemoryEmitter) Emit(eventName string, payload interface{}) <-chan error
 
 // EmitSync dispatches an event synchronously to all subscribers of the event's topic and
 // collects any errors that occurred. This method will block until all notifications are completed.
-func (m *MemoryEmitter) EmitSync(eventName string, payload interface{}) []error {
+func (m *MemoryEmitter) EmitSync(eventName string, payload any) []error {
 	if m.closed.Load() {
 		return []error{ErrEmitterClosed}
 	}
@@ -119,7 +119,7 @@ func (m *MemoryEmitter) EmitSync(eventName string, payload interface{}) []error 
 
 // handleEvents is an internal method that processes an event and notifies all
 // registered listeners. It takes care of error handling and panic recovery.
-func (m *MemoryEmitter) handleEvents(topicName string, payload interface{}, errorHandler func(error)) {
+func (m *MemoryEmitter) handleEvents(topicName string, payload any, errorHandler func(error)) {
 	defer func() {
 		if r := recover(); r != nil {
 			if handler := m.panicHandler.Load(); handler != nil {
@@ -129,7 +129,7 @@ func (m *MemoryEmitter) handleEvents(topicName string, payload interface{}, erro
 	}()
 
 	event := NewBaseEvent(topicName, payload)
-	m.topics.Range(func(key, value interface{}) bool {
+	m.topics.Range(func(key, value any) bool {
 		topicPattern := key.(string)
 		if matchTopicPattern(topicPattern, topicName) {
 			topic := value.(*Topic)
@@ -181,7 +181,7 @@ func (m *MemoryEmitter) SetPool(pool Pool) {
 
 func (m *MemoryEmitter) SetPanicHandler(panicHandler PanicHandler) {
 	if panicHandler != nil {
-		handler := func(p interface{}) { panicHandler(p) }
+		handler := func(p any) { panicHandler(p) }
 		m.panicHandler.Store(&handler)
 	}
 }
@@ -200,7 +200,7 @@ func (m *MemoryEmitter) Close() error {
 	m.closed.Store(true)
 
 	// Perform cleanup operations
-	m.topics.Range(func(key, value interface{}) bool {
+	m.topics.Range(func(key, value any) bool {
 		m.topics.Delete(key)
 		return true
 	})

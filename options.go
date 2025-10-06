@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -19,14 +20,18 @@ var DefaultErrorHandler = func(event Event, err error) error {
 var DefaultIDGenerator = func() string {
 	timestamp := time.Now().UnixNano()
 	randomBytes := make([]byte, 16) // 128 bits
-	_, err := rand.Read(randomBytes)
-	if err != nil {
+	if _, err := rand.Read(randomBytes); err != nil {
 		panic(err)
 	}
-	return hex.EncodeToString(randomBytes) + fmt.Sprintf("%x", timestamp)
+
+	var b strings.Builder
+	b.Grow(32 + 16) // Pre-allocate: 32 hex chars + 16 timestamp chars
+	b.WriteString(hex.EncodeToString(randomBytes))
+	b.WriteString(fmt.Sprintf("%x", timestamp))
+	return b.String()
 }
 
-var DefaultPanicHandler = func(p interface{}) {
+var DefaultPanicHandler = func(p any) {
 	fmt.Printf("Panic occurred: %v\n", p)
 }
 
@@ -51,7 +56,7 @@ func WithPool(pool Pool) EmitterOption {
 	}
 }
 
-type PanicHandler func(interface{})
+type PanicHandler func(any)
 
 func WithPanicHandler(panicHandler PanicHandler) EmitterOption {
 	return func(m Emitter) {

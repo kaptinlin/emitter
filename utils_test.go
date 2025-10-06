@@ -2,6 +2,8 @@ package emitter
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestMatchTopicPattern(t *testing.T) {
@@ -56,9 +58,8 @@ func TestMatchTopicPattern(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.pattern+"_"+tt.subject, func(t *testing.T) {
-			if got := matchTopicPattern(tt.pattern, tt.subject); got != tt.want {
-				t.Errorf("matchTopicPattern(%q, %q) = %v, want %v", tt.pattern, tt.subject, got, tt.want)
-			}
+			got := matchTopicPattern(tt.pattern, tt.subject)
+			assert.Equal(t, tt.want, got, "matchTopicPattern(%q, %q)", tt.pattern, tt.subject)
 		})
 	}
 }

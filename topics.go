@@ -36,9 +36,13 @@ func (t *Topic) addSortedListenerID(id string, priority Priority) {
 
 // removeSortedListenerID removes a listener ID from the sorted slice.
 func (t *Topic) removeSortedListenerID(id string) {
-	t.sortedListenerIDs = slices.DeleteFunc(t.sortedListenerIDs, func(listenerID string) bool {
-		return listenerID == id
+	// Use binary search since slice is sorted
+	idx := sort.Search(len(t.sortedListenerIDs), func(i int) bool {
+		return t.sortedListenerIDs[i] >= id
 	})
+	if idx < len(t.sortedListenerIDs) && t.sortedListenerIDs[idx] == id {
+		t.sortedListenerIDs = slices.Delete(t.sortedListenerIDs, idx, idx+1)
+	}
 }
 
 // AddListener adds a new listener to the topic with a specified priority and returns an identifier for the listener.

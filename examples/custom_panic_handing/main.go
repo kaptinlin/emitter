@@ -8,7 +8,7 @@ import (
 )
 
 // CustomPanicHandler logs the panic information and performs necessary cleanup.
-func CustomPanicHandler(recoveredPanic interface{}) {
+func CustomPanicHandler(recoveredPanic any) {
 	fmt.Printf("Recovered from panic: %v", recoveredPanic)
 	// Additional panic recovery logic can go here.
 	// For example, you might want to notify an administrator or restart the operation that caused the panic.

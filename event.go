@@ -1,12 +1,12 @@
 package emitter
 
-import "sync"
+import "sync/atomic"
 
 // Event is an interface representing the structure of an event.
 type Event interface {
 	Topic() string
-	Payload() interface{}
-	SetPayload(interface{})
+	Payload() any
+	SetPayload(any)
 	SetAborted(bool)
 	IsAborted() bool
 }
@@ -14,17 +14,17 @@ type Event interface {
 // BaseEvent provides a basic implementation of the Event interface.
 type BaseEvent struct {
 	topic   string
-	payload interface{}
-	aborted bool
-	mu      sync.RWMutex // Changed from sync.Mutex to sync.RWMutex
+	payload atomic.Pointer[any]
+	aborted atomic.Bool
 }
 
 // NewBaseEvent creates a new instance of BaseEvent with a payload.
-func NewBaseEvent(topic string, payload interface{}) *BaseEvent {
-	return &BaseEvent{
-		topic:   topic,
-		payload: payload,
+func NewBaseEvent(topic string, payload any) *BaseEvent {
+	e := &BaseEvent{
+		topic: topic,
 	}
+	e.payload.Store(&payload)
+	return e
 }
 
 // Topic returns the event's topic.
@@ -33,29 +33,24 @@ func (e *BaseEvent) Topic() string {
 }
 
 // Payload returns the event's payload.
-func (e *BaseEvent) Payload() interface{} {
-	e.mu.RLock() // Read lock
-	defer e.mu.RUnlock()
-	return e.payload
+func (e *BaseEvent) Payload() any {
+	if p := e.payload.Load(); p != nil {
+		return *p
+	}
+	return nil
 }
 
 // SetPayload sets the event's payload.
-func (e *BaseEvent) SetPayload(payload interface{}) {
-	e.mu.Lock() // Write lock
-	defer e.mu.Unlock()
-	e.payload = payload
+func (e *BaseEvent) SetPayload(payload any) {
+	e.payload.Store(&payload)
 }
 
 // SetAborted sets the event's aborted status.
 func (e *BaseEvent) SetAborted(abort bool) {
-	e.mu.Lock() // Write lock
-	defer e.mu.Unlock()
-	e.aborted = abort
+	e.aborted.Store(abort)
 }
 
 // IsAborted checks the event's aborted status.
 func (e *BaseEvent) IsAborted() bool {
-	e.mu.RLock() // Read lock
-	defer e.mu.RUnlock()
-	return e.aborted
+	return e.aborted.Load()
 }

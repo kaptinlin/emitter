@@ -3,6 +3,9 @@ package emitter
 import (
 	"sync"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestPriorityOrdering checks if the Emitter calls listeners in the correct order of their priorities.
@@ -24,9 +27,7 @@ func TestPriorityOrdering(t *testing.T) {
 			mu.Unlock() // Unlock the mutex after appending.
 			return nil
 		}, WithPriority(priority))
-		if err != nil {
-			t.Fatalf("Error adding listener with priority %v: %v", priority, err)
-		}
+		require.NoError(t, err, "Error adding listener with priority %v", priority)
 	}
 
 	// Set up listeners with different priorities.
@@ -45,14 +46,10 @@ func TestPriorityOrdering(t *testing.T) {
 	expectedOrder := []Priority{Highest, High, Normal, Low, Lowest}
 	mu.Lock() // Lock the mutex to safely read callOrder.
 	defer mu.Unlock()
-	if len(callOrder) != len(expectedOrder) {
-		t.Fatalf("Expected call order length to be %d, got %d", len(expectedOrder), len(callOrder))
-	}
+	require.Len(t, callOrder, len(expectedOrder), "Call order length mismatch")
 
 	for i, priority := range expectedOrder {
-		if callOrder[i] != priority {
-			t.Errorf("Expected priority %v at index %d, got %v", priority, i, callOrder[i])
-		}
+		assert.Equal(t, priority, callOrder[i], "Expected priority %v at index %d", priority, i)
 	}
 }
 
@@ -78,15 +75,14 @@ func TestEmitSyncWithAbort(t *testing.T) {
 	}
 
 	// Subscribe the listeners to the "testTopic".
-	if _, err := emitter.On("testTopic", lowPriorityListener, WithPriority(Low)); err != nil {
-		t.Fatalf("Error adding low priority listener: %v", err)
-	}
-	if _, err := emitter.On("testTopic", abortingListener, WithPriority(Normal)); err != nil {
-		t.Fatalf("Error adding aborting listener: %v", err)
-	}
-	if _, err := emitter.On("testTopic", highPriorityListener, WithPriority(High)); err != nil {
-		t.Fatalf("Error adding high priority listener: %v", err)
-	}
+	_, err := emitter.On("testTopic", lowPriorityListener, WithPriority(Low))
+	require.NoError(t, err, "Error adding low priority listener")
+
+	_, err = emitter.On("testTopic", abortingListener, WithPriority(Normal))
+	require.NoError(t, err, "Error adding aborting listener")
+
+	_, err = emitter.On("testTopic", highPriorityListener, WithPriority(High))
+	require.NoError(t, err, "Error adding high priority listener")
 
 	// Emit the event synchronously.
 	emitter.EmitSync("testTopic", "testPayload")
@@ -116,15 +112,14 @@ func TestEmitWithAbort(t *testing.T) {
 	}
 
 	// Subscribe the listeners to the "testTopic".
-	if _, err := emitter.On("testTopic", lowPriorityListener, WithPriority(Low)); err != nil {
-		t.Fatalf("Error adding low priority listener: %v", err)
-	}
-	if _, err := emitter.On("testTopic", abortingListener, WithPriority(Normal)); err != nil {
-		t.Fatalf("Error adding aborting listener: %v", err)
-	}
-	if _, err := emitter.On("testTopic", highPriorityListener, WithPriority(High)); err != nil {
-		t.Fatalf("Error adding high priority listener: %v", err)
-	}
+	_, err := emitter.On("testTopic", lowPriorityListener, WithPriority(Low))
+	require.NoError(t, err, "Error adding low priority listener")
+
+	_, err = emitter.On("testTopic", abortingListener, WithPriority(Normal))
+	require.NoError(t, err, "Error adding aborting listener")
+
+	_, err = emitter.On("testTopic", highPriorityListener, WithPriority(High))
+	require.NoError(t, err, "Error adding high priority listener")
 
 	// Emit the event asynchronously.
 	errChan := emitter.Emit("testTopic", "testPayload")
@@ -138,12 +133,8 @@ func TestEmitWithAbort(t *testing.T) {
 	}
 
 	// Check that the low priority listener was not called.
-	if lowPriorityListenerCalled {
-		t.Error("The low priority listener should not have been called")
-	}
+	assert.False(t, lowPriorityListenerCalled, "The low priority listener should not have been called")
 
 	// Check that there were no errors during emission.
-	if len(emitErrors) != 0 {
-		t.Errorf("Emit() resulted in errors: %v", emitErrors)
-	}
+	assert.Empty(t, emitErrors, "Emit() resulted in errors")
 }

@@ -11,6 +11,16 @@ var (
 
 // matchTopicPattern checks if the given subject matches the pattern with wildcards.
 func matchTopicPattern(pattern, subject string) bool {
+	// Fast path for exact match
+	if pattern == subject {
+		return true
+	}
+
+	// Fast path for simple wildcard without dots
+	if !strings.Contains(pattern, ".") && !strings.Contains(subject, ".") {
+		return pattern == SingleWildcard || pattern == MultiWildcard
+	}
+
 	// Special case: single wildcard matches an empty string
 	if pattern == SingleWildcard && subject == "" {
 		return true

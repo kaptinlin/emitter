@@ -13,11 +13,11 @@ type Emitter interface {
 	Off(topicName string, listenerID string) error
 
 	// Emit asynchronously sends an event to all subscribers of a topic and returns a channel of errors.
-	Emit(eventName string, payload interface{}) <-chan error
+	Emit(eventName string, payload any) <-chan error
 
 	// EmitSync sends an event synchronously to all subscribers of a topic and collects any errors that occurred.
 	// This method blocks until all listeners have been notified.
-	EmitSync(eventName string, payload interface{}) []error
+	EmitSync(eventName string, payload any) []error
 
 	// GetTopic retrieves the Topic object associated with the given topic name.
 	// It returns an error if the topic does not exist.

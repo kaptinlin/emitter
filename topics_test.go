@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"sync"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -23,9 +26,7 @@ func mockListener(id string, shouldError bool) Listener {
 
 func TestNewTopic(t *testing.T) {
 	topic := NewTopic()
-	if topic == nil {
-		t.Error("NewTopic() should not return nil")
-	}
+	assert.NotNil(t, topic, "NewTopic() should not return nil")
 }
 
 func TestAddRemoveListener(t *testing.T) {
@@ -35,29 +36,19 @@ func TestAddRemoveListener(t *testing.T) {
 
 	id1 := "1"
 	topic.AddListener(id1, listener1)
-	if len(topic.listeners) != 1 {
-		t.Error("AddListener() failed to add listener 1")
-	}
+	assert.Len(t, topic.listeners, 1, "AddListener() failed to add listener 1")
 
 	id2 := "2"
 	topic.AddListener(id2, listener2)
-	if len(topic.listeners) != 2 {
-		t.Error("AddListener() failed to add listener 2")
-	}
+	assert.Len(t, topic.listeners, 2, "AddListener() failed to add listener 2")
 
-	if err := topic.RemoveListener(id1); err != nil {
-		t.Errorf("RemoveListener() failed to remove listener 1: %v", err)
-	}
-	if len(topic.listeners) != 1 {
-		t.Errorf("RemoveListener() failed to remove listener 1, remaining listeners: %d", len(topic.listeners))
-	}
+	err := topic.RemoveListener(id1)
+	require.NoError(t, err, "RemoveListener() failed to remove listener 1")
+	assert.Len(t, topic.listeners, 1, "RemoveListener() failed to remove listener 1")
 
-	if err := topic.RemoveListener(id2); err != nil {
-		t.Errorf("RemoveListener() failed to remove listener 2: %v", err)
-	}
-	if len(topic.listeners) != 0 {
-		t.Errorf("RemoveListener() failed to remove listener 2, remaining listeners: %d", len(topic.listeners))
-	}
+	err = topic.RemoveListener(id2)
+	require.NoError(t, err, "RemoveListener() failed to remove listener 2")
+	assert.Empty(t, topic.listeners, "RemoveListener() failed to remove listener 2")
 }
 
 func TestTriggerListeners(t *testing.T) {
@@ -79,11 +70,8 @@ func TestTriggerListeners(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		errors := topic.Trigger(event)
-		if len(errors) != 1 {
-			t.Errorf("Trigger() should return exactly 1 error, got: %d", len(errors))
-		} else if errors[0].Error() != "listener error 2: listener error base" {
-			t.Errorf("Trigger() should return 'listener error 2: listener error base', got: %s", errors[0].Error())
-		}
+		require.Len(t, errors, 1, "Trigger() should return exactly 1 error")
+		assert.Equal(t, "listener error 2: listener error base", errors[0].Error())
 	}()
 
 	wg.Wait()

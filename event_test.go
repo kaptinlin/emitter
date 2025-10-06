@@ -2,24 +2,21 @@ package emitter
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewBaseEvent(t *testing.T) {
 	payload := map[string]string{"key": "value"} // Payload is a map
 	event := NewBaseEvent("test_topic", payload)
 
-	if event.Topic() != "test_topic" {
-		t.Errorf("NewBaseEvent() topic = %s; want test_topic", event.Topic())
-	}
+	assert.Equal(t, "test_topic", event.Topic())
 
 	retrievedPayload, ok := event.Payload().(map[string]string)
-	if !ok {
-		t.Fatalf("Payload is not of type map[string]string")
-	}
+	require.True(t, ok, "Payload is not of type map[string]string")
 
-	if retrievedPayload["key"] != "value" {
-		t.Errorf("NewBaseEvent() payload = %v; want %v", event.Payload(), payload)
-	}
+	assert.Equal(t, "value", retrievedPayload["key"])
 }
 
 func TestBaseEventSetAbortedAndIsAborted(t *testing.T) {
@@ -29,17 +26,11 @@ func TestBaseEventSetAbortedAndIsAborted(t *testing.T) {
 
 	event := NewBaseEvent("test_topic", Payload{Data: "some data"}) // Payload is a struct
 
-	if event.IsAborted() {
-		t.Errorf("Newly created event should not be aborted")
-	}
+	assert.False(t, event.IsAborted(), "Newly created event should not be aborted")
 
 	event.SetAborted(true)
-	if !event.IsAborted() {
-		t.Errorf("BaseEvent.Abort(true) did not abort the event")
-	}
+	assert.True(t, event.IsAborted(), "BaseEvent.Abort(true) did not abort the event")
 
 	event.SetAborted(false)
-	if event.IsAborted() {
-		t.Errorf("BaseEvent.Abort(false) did not unabort the event")
-	}
+	assert.False(t, event.IsAborted(), "BaseEvent.Abort(false) did not unabort the event")
 }

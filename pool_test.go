@@ -5,6 +5,9 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestEmitEventWithPool(t *testing.T) {
@@ -17,9 +20,7 @@ func TestEmitEventWithPool(t *testing.T) {
 		return nil
 	})
 
-	if err != nil {
-		t.Fatalf("Error adding listener: %v", err)
-	}
+	require.NoError(t, err, "Error adding listener")
 
 	errChan := emitter.Emit("testEvent", nil)
 
@@ -37,19 +38,14 @@ func TestEmitEventWithPool(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Check for errors reported by the listener.
-	if len(errors) > 0 {
-		t.Fatalf("Listener reported errors: %v", errors)
-	}
+	assert.Empty(t, errors, "Listener reported errors")
 
 	// Unregister the listener as cleanup.
-	if err := emitter.Off("testEvent", listenerID); err != nil {
-		t.Errorf("Failed to unregister listener: %v", err)
-	}
+	err = emitter.Off("testEvent", listenerID)
+	require.NoError(t, err, "Failed to unregister listener")
 
 	// Final assertion after cleanup.
-	if atomic.LoadInt32(&processedEvents) != 1 {
-		t.Fatalf("Expected 1 event to be processed, but got %d", processedEvents)
-	}
+	assert.Equal(t, int32(1), atomic.LoadInt32(&processedEvents), "Expected 1 event to be processed")
 }
 
 func TestEmitMultipleEventsWithPool(t *testing.T) {
@@ -80,9 +76,7 @@ func TestEmitMultipleEventsWithPool(t *testing.T) {
 
 		return nil
 	})
-	if err != nil {
-		t.Fatalf("Error adding listener: %v", err)
-	}
+	require.NoError(t, err, "Error adding listener")
 
 	// Emit multiple events concurrently.
 	for i := 0; i < numConcurrentEvents; i++ {
@@ -105,7 +99,5 @@ func TestEmitMultipleEventsWithPool(t *testing.T) {
 	wg.Wait()
 
 	// Check if any errors occurred during event processing.
-	if processingError != nil {
-		t.Errorf("Error processing event: %v", processingError)
-	}
+	assert.NoError(t, processingError, "Error processing event")
 }

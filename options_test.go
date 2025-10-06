@@ -4,6 +4,9 @@ import (
 	"errors"
 	"sync"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -37,17 +40,13 @@ func TestWithErrorHandler(t *testing.T) {
 
 	// Subscribe the listener to a topic.
 	_, err := emitter.On("testTopic", listener)
-	if err != nil {
-		t.Fatalf("On() failed with error: %v", err)
-	}
+	require.NoError(t, err, "On() failed with error")
 
 	// Emit the event synchronously to trigger the error.
 	emitter.EmitSync("testTopic", NewBaseEvent("testTopic", "testPayload"))
 
 	// Check if the custom error handler was called.
-	if !handlerCalled {
-		t.Fatalf("Custom error handler was not called on listener error")
-	}
+	assert.True(t, handlerCalled, "Custom error handler was not called on listener error")
 }
 func TestWithErrorHandlerAsync(t *testing.T) {
 	// Define a variable to determine if the custom error handler was called.
@@ -77,26 +76,20 @@ func TestWithErrorHandlerAsync(t *testing.T) {
 
 	// Subscribe the listener to a topic.
 	_, err := emitter.On("testTopic", listener)
-	if err != nil {
-		t.Fatalf("On() failed with error: %v", err)
-	}
+	require.NoError(t, err, "On() failed with error")
 
 	// Emit the event asynchronously to trigger the error.
 	errChan := emitter.Emit("testTopic", NewBaseEvent("testTopic", "testPayload"))
 
 	// Wait for all errors to be processed.
 	for err := range errChan {
-		if err != nil {
-			t.Errorf("Expected nil error due to custom handler, got: %v", err)
-		}
+		assert.NoError(t, err, "Expected nil error due to custom handler")
 	}
 
 	// Check if the custom error handler was called.
 	handlerMutex.Lock()
 	defer handlerMutex.Unlock()
-	if !handlerCalled {
-		t.Fatalf("Custom error handler was not called on listener error")
-	}
+	assert.True(t, handlerCalled, "Custom error handler was not called on listener error")
 }
 
 func TestWithPanicHandlerSync(t *testing.T) {
@@ -120,9 +113,7 @@ func TestWithPanicHandlerSync(t *testing.T) {
 
 	// Subscribe the listener to a topic.
 	_, err := emitter.On("testTopic", listener)
-	if err != nil {
-		t.Fatalf("On() failed with error: %v", err)
-	}
+	require.NoError(t, err, "On() failed with error")
 
 	// Recover from panic to prevent test failure
 	defer func() {
@@ -136,9 +127,7 @@ func TestWithPanicHandlerSync(t *testing.T) {
 	emitter.EmitSync("testTopic", "testPayload")
 
 	// Verify that the custom panic handler was invoked
-	if !panicHandlerInvoked {
-		t.Fatalf("Custom panic handler was not called on listener panic")
-	}
+	assert.True(t, panicHandlerInvoked, "Custom panic handler was not called on listener panic")
 }
 
 func TestWithPanicHandlerAsync(t *testing.T) {
@@ -165,9 +154,7 @@ func TestWithPanicHandlerAsync(t *testing.T) {
 
 	// Subscribe the listener to a topic.
 	_, err := emitter.On("testTopic", listener)
-	if err != nil {
-		t.Fatalf("On() failed with error: %v", err)
-	}
+	require.NoError(t, err, "On() failed with error")
 
 	// Emit the event asynchronously to trigger the panic.
 	errChan := emitter.Emit("testTopic", "testPayload")
@@ -180,9 +167,7 @@ func TestWithPanicHandlerAsync(t *testing.T) {
 	// Verify that the custom panic handler was invoked
 	panicHandlerMutex.Lock()
 	defer panicHandlerMutex.Unlock()
-	if !panicHandlerInvoked {
-		t.Fatalf("Custom panic handler was not called on listener panic")
-	}
+	assert.True(t, panicHandlerInvoked, "Custom panic handler was not called on listener panic")
 }
 
 func TestWithIDGenerator(t *testing.T) {
@@ -204,12 +189,8 @@ func TestWithIDGenerator(t *testing.T) {
 
 	// Subscribe the listener to a topic and capture the returned ID.
 	returnedID, err := emitter.On("testTopic", listener)
-	if err != nil {
-		t.Fatalf("On() failed with error: %v", err)
-	}
+	require.NoError(t, err, "On() failed with error")
 
 	// Check if the returned ID matches the custom ID.
-	if returnedID != customID {
-		t.Fatalf("Expected ID to be '%s', but got '%s'", customID, returnedID)
-	}
+	assert.Equal(t, customID, returnedID, "Expected ID to match custom ID")
 }
