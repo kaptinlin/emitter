@@ -2,10 +2,7 @@ package emitter
 
 import (
 	"crypto/rand"
-	"encoding/hex"
 	"fmt"
-	"strings"
-	"time"
 )
 
 // EmitterOption defines a function type for Emitter configuration options.
@@ -15,20 +12,12 @@ var DefaultErrorHandler = func(event Event, err error) error {
 	return err
 }
 
-// DefaultIDGenerator generates a unique identifier using a combination of the current time
-// and random bytes, encoded in hexadecimal.
+// DefaultIDGenerator generates a unique identifier using cryptographically secure random text.
+// This is more efficient than hex encoding and timestamp concatenation.
+// Uses crypto/rand.Text (Go 1.24+) which returns a base32-encoded string with at least 128 bits of randomness.
 var DefaultIDGenerator = func() string {
-	timestamp := time.Now().UnixNano()
-	randomBytes := make([]byte, 16) // 128 bits
-	if _, err := rand.Read(randomBytes); err != nil {
-		panic(err)
-	}
-
-	var b strings.Builder
-	b.Grow(32 + 16) // Pre-allocate: 32 hex chars + 16 timestamp chars
-	b.WriteString(hex.EncodeToString(randomBytes))
-	b.WriteString(fmt.Sprintf("%x", timestamp))
-	return b.String()
+	// Generate cryptographically secure random text (base32-encoded with at least 128 bits of randomness)
+	return rand.Text()
 }
 
 var DefaultPanicHandler = func(p any) {
