@@ -65,8 +65,9 @@ func matchTopicPattern(pattern, subject string) bool {
 				return true
 			}
 			// Try to match '**' with every possible subsequent part.
-			for i := s; i <= len(subjectParts); i++ {
-				if matchParts(p+1, i) {
+			// Using Go 1.22 range-over-int for cleaner, more idiomatic code
+			for i := range len(subjectParts) - s + 1 {
+				if matchParts(p+1, s+i) {
 					return true
 				}
 			}
