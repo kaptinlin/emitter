@@ -17,3 +17,4 @@ release/
 coverage/
 coverage*.**
 *.log
+.claude/.DS_Store
