@@ -26,21 +26,12 @@ func (t *Topic) addSortedListenerID(id string, priority Priority) {
 	index := sort.Search(len(t.sortedListenerIDs), func(i int) bool {
 		return t.listeners[t.sortedListenerIDs[i]].priority <= priority
 	})
-	// Extend the slice by one element.
-	t.sortedListenerIDs = append(t.sortedListenerIDs, "")
-	// Move the higher priority elements up one slot to make room for the new ID.
-	copy(t.sortedListenerIDs[index+1:], t.sortedListenerIDs[index:])
-	// Set the new ID in the correct slot.
-	t.sortedListenerIDs[index] = id
+	t.sortedListenerIDs = slices.Insert(t.sortedListenerIDs, index, id)
 }
 
 // removeSortedListenerID removes a listener ID from the sorted slice.
 func (t *Topic) removeSortedListenerID(id string) {
-	// Use binary search since slice is sorted
-	idx := sort.Search(len(t.sortedListenerIDs), func(i int) bool {
-		return t.sortedListenerIDs[i] >= id
-	})
-	if idx < len(t.sortedListenerIDs) && t.sortedListenerIDs[idx] == id {
+	if idx := slices.Index(t.sortedListenerIDs, id); idx != -1 {
 		t.sortedListenerIDs = slices.Delete(t.sortedListenerIDs, idx, idx+1)
 	}
 }

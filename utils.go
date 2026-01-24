@@ -4,7 +4,7 @@ import (
 	"strings"
 )
 
-var (
+const (
 	SingleWildcard = "*" // Now only one wildcard variable for single node.
 	MultiWildcard  = "**"
 )

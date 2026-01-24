@@ -74,6 +74,8 @@ func (m *MemoryEmitter) Off(topicName string, listenerID string) error {
 
 // Emit asynchronously dispatches an event to all the subscribers of the event's topic.
 // It returns a channel that will receive any errors encountered during event handling.
+// Emit asynchronously dispatches an event to all the subscribers of the event's topic.
+// It returns a channel that will receive any errors encountered during event handling.
 func (m *MemoryEmitter) Emit(eventName string, payload any) <-chan error {
 	errChan := make(chan error, m.errChanBufferSize)
 
@@ -84,20 +86,17 @@ func (m *MemoryEmitter) Emit(eventName string, payload any) <-chan error {
 		return errChan
 	}
 
-	if m.Pool != nil {
-		m.Pool.Submit(func() {
-			defer close(errChan)
-			m.handleEvents(eventName, payload, func(err error) {
-				errChan <- err
-			})
+	task := func() {
+		defer close(errChan)
+		m.handleEvents(eventName, payload, func(err error) {
+			errChan <- err
 		})
+	}
+
+	if m.Pool != nil {
+		m.Pool.Submit(task)
 	} else {
-		go func() {
-			defer close(errChan)
-			m.handleEvents(eventName, payload, func(err error) {
-				errChan <- err
-			})
-		}()
+		go task()
 	}
 
 	return errChan
