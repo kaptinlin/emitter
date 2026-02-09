@@ -10,9 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var (
-	errListenerBase = errors.New("listener error base")
-)
+var errListenerBase = errors.New("listener error base")
 
 // mockListener simulates a listener function for testing.
 func mockListener(id string, shouldError bool) Listener {
@@ -65,14 +63,12 @@ func TestTriggerListeners(t *testing.T) {
 	topic.AddListener("2", mockListener("2", true))
 
 	var wg sync.WaitGroup
-	wg.Add(1)
 
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		errors := topic.Trigger(event)
 		require.Len(t, errors, 1, "Trigger() should return exactly 1 error")
 		assert.Equal(t, "listener error 2: listener error base", errors[0].Error())
-	}()
+	})
 
 	wg.Wait()
 }

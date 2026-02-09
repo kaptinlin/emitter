@@ -2,7 +2,6 @@ package emitter
 
 import (
 	"slices"
-	"sort"
 	"sync"
 )
 
@@ -22,9 +21,11 @@ func NewTopic() *Topic {
 }
 
 // addSortedListenerID inserts a listener ID into the sorted slice at the correct position.
+// Listeners are sorted in descending priority order (highest first).
 func (t *Topic) addSortedListenerID(id string, priority Priority) {
-	index := sort.Search(len(t.sortedListenerIDs), func(i int) bool {
-		return t.listeners[t.sortedListenerIDs[i]].priority <= priority
+	index, _ := slices.BinarySearchFunc(t.sortedListenerIDs, priority, func(existingID string, target Priority) int {
+		// Negate to maintain descending order: higher priority comes first.
+		return int(target) - int(t.listeners[existingID].priority)
 	})
 	t.sortedListenerIDs = slices.Insert(t.sortedListenerIDs, index, id)
 }

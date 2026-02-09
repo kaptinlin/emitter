@@ -9,8 +9,11 @@ type listenerItem struct {
 	priority Priority
 }
 
+// ListenerOption configures a [listenerItem] when registering a listener.
 type ListenerOption func(*listenerItem)
 
+// WithPriority sets the priority level for a listener.
+// Invalid priorities are clamped to the valid range [Lowest, Highest].
 func WithPriority(priority Priority) ListenerOption {
 	return func(item *listenerItem) {
 		// Validate priority and use boundary values if out of range

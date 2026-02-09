@@ -9,9 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var (
-	errTestCustomError = errors.New("custom error")
-)
+var errTestCustomError = errors.New("custom error")
 
 // TestWithErrorHandler tests that the custom error handler is called on error.
 func TestWithErrorHandler(t *testing.T) {
@@ -48,6 +46,7 @@ func TestWithErrorHandler(t *testing.T) {
 	// Check if the custom error handler was called.
 	assert.True(t, handlerCalled, "Custom error handler was not called on listener error")
 }
+
 func TestWithErrorHandlerAsync(t *testing.T) {
 	// Define a variable to determine if the custom error handler was called.
 	var handlerCalled bool
@@ -97,7 +96,7 @@ func TestWithPanicHandlerSync(t *testing.T) {
 	var panicHandlerInvoked bool
 
 	// Define a custom panic handler
-	customPanicHandler := func(p interface{}) {
+	customPanicHandler := func(p any) {
 		if p == "test panic" {
 			panicHandlerInvoked = true
 		}
@@ -136,7 +135,7 @@ func TestWithPanicHandlerAsync(t *testing.T) {
 	var panicHandlerMutex sync.Mutex // To safely update panicHandlerInvoked from different goroutines
 
 	// Define a custom panic handler
-	customPanicHandler := func(p interface{}) {
+	customPanicHandler := func(p any) {
 		panicHandlerMutex.Lock()
 		defer panicHandlerMutex.Unlock()
 		if p == "test panic" {

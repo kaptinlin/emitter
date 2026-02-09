@@ -49,45 +49,27 @@ func TestEmitEventWithPool(t *testing.T) {
 }
 
 func TestEmitMultipleEventsWithPool(t *testing.T) {
-	// Create a MemoryEmitter instance with a PondPool.
 	emitter := NewMemoryEmitter(WithPool(NewPondPool(10, 100)))
 
-	// Define the number of concurrent events to emit.
 	numConcurrentEvents := 10
 
-	// Define a wait group to wait for all events to be processed.
 	var wg sync.WaitGroup
 	wg.Add(numConcurrentEvents)
 
-	// Define a variable to keep track of any errors encountered during event processing.
 	var processingError error
 
-	// Add an event listener to handle "testEvent" and increment the processedEvents count.
 	_, err := emitter.On("testEvent", func(event Event) error {
-		// Simulate some processing.
-		// For testing, we just sleep for a short time to simulate work.
-		// In a real scenario, you should replace this with your actual event processing logic.
-		// Sleep for 100 milliseconds to simulate processing.
-		// You can adjust the sleep duration based on your test requirements.
 		time.Sleep(100 * time.Millisecond)
-
-		// Decrement the wait group to signal event processing completion.
 		wg.Done()
-
 		return nil
 	})
 	require.NoError(t, err, "Error adding listener")
 
-	// Emit multiple events concurrently.
-	for i := 0; i < numConcurrentEvents; i++ {
+	for range numConcurrentEvents {
 		go func() {
-			// Emit an event using the emitter.
 			errChan := emitter.Emit("testEvent", nil)
-
-			// Wait for the event to be processed.
 			for err := range errChan {
 				if err != nil {
-					// Capture the first error encountered during event processing.
 					processingError = err
 					break
 				}
@@ -95,9 +77,7 @@ func TestEmitMultipleEventsWithPool(t *testing.T) {
 		}()
 	}
 
-	// Wait for all events to be processed.
 	wg.Wait()
 
-	// Check if any errors occurred during event processing.
 	assert.NoError(t, processingError, "Error processing event")
 }

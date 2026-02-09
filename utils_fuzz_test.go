@@ -1,8 +1,6 @@
 package emitter
 
-import (
-	"testing"
-)
+import "testing"
 
 // FuzzMatchTopicPattern fuzzes the matchTopicPattern function to ensure it doesn't panic
 func FuzzMatchTopicPattern(f *testing.F) {

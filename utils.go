@@ -1,12 +1,10 @@
 package emitter
 
-import (
-	"strings"
-)
+import "strings"
 
 const (
-	SingleWildcard = "*" // Now only one wildcard variable for single node.
-	MultiWildcard  = "**"
+	SingleWildcard = "*"  // Matches exactly one topic segment.
+	MultiWildcard  = "**" // Matches zero or more topic segments.
 )
 
 // matchTopicPattern checks if the given subject matches the pattern with wildcards.
@@ -30,7 +28,10 @@ func matchTopicPattern(pattern, subject string) bool {
 	subjectParts := strings.Split(subject, ".")
 
 	// Handle the case where pattern ends with ".**", it should not match just "event"
-	if len(patternParts) > 1 && patternParts[len(patternParts)-1] == MultiWildcard && len(subjectParts) == 1 && subjectParts[0] == patternParts[0] {
+	if len(patternParts) > 1 &&
+		patternParts[len(patternParts)-1] == MultiWildcard &&
+		len(subjectParts) == 1 &&
+		subjectParts[0] == patternParts[0] {
 		return false
 	}
 
@@ -81,6 +82,8 @@ func matchTopicPattern(pattern, subject string) bool {
 	return matchParts(0, 0)
 }
 
+// isValidTopicName checks whether the given topic name is valid.
+// Empty strings and strings containing regex-like characters are rejected.
 func isValidTopicName(topicName string) bool {
-	return !strings.ContainsAny(topicName, "?[")
+	return topicName != "" && !strings.ContainsAny(topicName, "?[")
 }

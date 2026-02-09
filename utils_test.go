@@ -63,3 +63,26 @@ func TestMatchTopicPattern(t *testing.T) {
 		})
 	}
 }
+
+func TestIsValidTopicName(t *testing.T) {
+	tests := []struct {
+		name  string
+		topic string
+		want  bool
+	}{
+		{"valid simple", "event", true},
+		{"valid dotted", "event.some.thing", true},
+		{"valid wildcard", "event.*", true},
+		{"valid multi wildcard", "event.**", true},
+		{"empty string", "", false},
+		{"contains question mark", "event?", false},
+		{"contains bracket", "event[0]", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := isValidTopicName(tt.topic)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}

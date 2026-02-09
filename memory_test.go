@@ -4,16 +4,172 @@ import (
 	"errors"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-var (
-	errTestListenerError = errors.New("listener error")
-)
+var errTestListenerError = errors.New("listener error")
+
+// Virtual time tests using synctest (Go 1.25+)
+// These tests provide deterministic concurrent testing without relying on real time.
+
+// TestPriorityOrderingWithDelays tests that listener priority is respected
+// even when listeners have different execution delays.
+func TestPriorityOrderingWithDelays(t *testing.T) {
+	t.Parallel()
+
+	synctest.Test(t, func(t *testing.T) {
+		e := NewMemoryEmitter()
+
+		var executionOrder []string
+
+		_, _ = e.On("priority.test", func(evt Event) error {
+			time.Sleep(50 * time.Millisecond)
+			executionOrder = append(executionOrder, "high")
+			return nil
+		}, WithPriority(High))
+
+		_, _ = e.On("priority.test", func(evt Event) error {
+			time.Sleep(100 * time.Millisecond)
+			executionOrder = append(executionOrder, "normal")
+			return nil
+		}, WithPriority(Normal))
+
+		_, _ = e.On("priority.test", func(evt Event) error {
+			time.Sleep(25 * time.Millisecond)
+			executionOrder = append(executionOrder, "low")
+			return nil
+		}, WithPriority(Low))
+
+		e.EmitSync("priority.test", nil)
+
+		// Verify execution order respects priority (not delay time)
+		if len(executionOrder) != 3 {
+			t.Fatalf("Expected 3 listeners executed, got %d", len(executionOrder))
+		}
+
+		if executionOrder[0] != "high" || executionOrder[1] != "normal" || executionOrder[2] != "low" {
+			t.Errorf("Unexpected execution order: %v (expected [high, normal, low])", executionOrder)
+		}
+	})
+}
+
+// TestConcurrentEmissions tests deterministic concurrent event emissions
+// using virtual time to avoid flakiness.
+func TestConcurrentEmissions(t *testing.T) {
+	t.Parallel()
+
+	synctest.Test(t, func(t *testing.T) {
+		e := NewMemoryEmitter()
+
+		var counter atomic.Int64
+		listener := func(evt Event) error {
+			counter.Add(1)
+			return nil
+		}
+
+		_, _ = e.On("concurrent.test", listener)
+
+		// Emit 100 events concurrently
+		for range 100 {
+			go func() {
+				e.EmitSync("concurrent.test", "data")
+			}()
+		}
+
+		// Virtual time makes this deterministic
+		time.Sleep(100 * time.Millisecond)
+
+		if counter.Load() != 100 {
+			t.Errorf("Expected 100 events processed, got %d", counter.Load())
+		}
+	})
+}
+
+// TestListenerRemovalDuringEmission tests thread-safe listener removal
+// while events are being emitted concurrently.
+func TestListenerRemovalDuringEmission(t *testing.T) {
+	t.Parallel()
+
+	synctest.Test(t, func(t *testing.T) {
+		e := NewMemoryEmitter()
+
+		var executionCount atomic.Int64
+		listener := func(evt Event) error {
+			executionCount.Add(1)
+			time.Sleep(10 * time.Millisecond)
+			return nil
+		}
+
+		listenerID, _ := e.On("removal.test", listener)
+
+		// Emit events before removal
+		for range 3 {
+			go func() {
+				e.EmitSync("removal.test", nil)
+			}()
+		}
+
+		time.Sleep(15 * time.Millisecond)
+
+		// Remove the listener
+		_ = e.Off("removal.test", listenerID)
+		initialCount := executionCount.Load()
+
+		// Emit events after removal - should not be processed
+		for range 5 {
+			go func() {
+				e.EmitSync("removal.test", nil)
+			}()
+		}
+
+		time.Sleep(50 * time.Millisecond)
+
+		// Count should not have changed after removal
+		if executionCount.Load() != initialCount {
+			t.Errorf("Expected execution count to remain %d after removal, got %d", initialCount, executionCount.Load())
+		}
+	})
+}
+
+// TestCloseWithPendingAsyncEvents tests proper cleanup when closing
+// an emitter while async events are still processing.
+func TestCloseWithPendingAsyncEvents(t *testing.T) {
+	t.Parallel()
+
+	synctest.Test(t, func(t *testing.T) {
+		e := NewMemoryEmitter()
+
+		listener := func(evt Event) error {
+			time.Sleep(100 * time.Millisecond)
+			return nil
+		}
+
+		_, _ = e.On("close.test", listener)
+
+		// Start async emission
+		errChan := e.Emit("close.test", "data")
+
+		// Close emitter while event is processing
+		time.Sleep(10 * time.Millisecond)
+		_ = e.Close()
+
+		// Should still complete the pending event
+		for range errChan {
+		}
+
+		// Further emissions should fail
+		errs := e.EmitSync("close.test", "more data")
+		if len(errs) == 0 {
+			t.Error("Expected error when emitting to closed emitter")
+		}
+	})
+}
 
 // TestNewMemoryEmitter tests the creation of a new MemoryEmitter.
 func TestNewMemoryEmitter(t *testing.T) {
@@ -37,6 +193,14 @@ func TestOnOff(t *testing.T) {
 	// Now unsubscribe and ensure the listener is removed.
 	err = emitter.Off("testTopic", id)
 	require.NoError(t, err, "Off() failed with error")
+}
+
+// TestOnEmptyTopicName tests that subscribing with an empty topic name returns an error.
+func TestOnEmptyTopicName(t *testing.T) {
+	emitter := NewMemoryEmitter()
+
+	_, err := emitter.On("", func(e Event) error { return nil })
+	assert.ErrorIs(t, err, ErrInvalidTopicName)
 }
 
 // TestEmitAsyncSuccess tests the asynchronous Emit method for successful event handling.
