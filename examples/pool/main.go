@@ -31,11 +31,11 @@ func main() {
 	}
 
 	// Emit several events concurrently
-	for i := 0; i < 10; i++ {
-		go func(index int) {
-			payload := fmt.Sprintf("User #%d", index)
+	for i := range 10 {
+		go func() {
+			payload := fmt.Sprintf("User #%d", i)
 			e.Emit("user.signup", payload)
-		}(i)
+		}()
 	}
 
 	// Wait for all events to be processed before shutting down

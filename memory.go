@@ -202,10 +202,7 @@ func (m *MemoryEmitter) Close() error {
 	m.closed.Store(true)
 
 	// Perform cleanup operations
-	m.topics.Range(func(key, value any) bool {
-		m.topics.Delete(key)
-		return true
-	})
+	m.topics.Clear()
 
 	if m.pool != nil {
 		m.pool.Release()
