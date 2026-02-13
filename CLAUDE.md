@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a **high-performance, thread-safe event emitter library** for Go 1.25 that leverages modern Go features for optimal performance and reliability. The library is designed for high-concurrency scenarios with lock-free operations and efficient memory management.
+This is a **high-performance, thread-safe event emitter library** for Go 1.26 that leverages modern Go features for optimal performance and reliability. The library is designed for high-concurrency scenarios with lock-free operations and efficient memory management.
 
 ## Common Development Commands
 
@@ -19,11 +19,11 @@ The project uses golangci-lint with version pinned in `.golangci.version`. Tests
 
 ## Go Version and Modern Optimizations
 
-This project targets **Go 1.25** and leverages cutting-edge Go features:
+This project targets **Go 1.26** and leverages cutting-edge Go features:
 
 ### Performance Optimizations
 - **`atomic.Pointer`**: Lock-free access to handlers (error, panic, ID generators)
-- **`slices.DeleteFunc`**: Efficient slice operations for listener management (Go 1.25)
+- **`slices.DeleteFunc`**: Efficient slice operations for listener management (Go 1.26)
 - **Zero-copy operations**: Minimal memory allocations in hot paths
 - **Concurrent-safe design**: Optimized for high-throughput scenarios
 
@@ -105,13 +105,13 @@ The emitter uses a functional options pattern (`options.go`) with these configur
 ### Memory Efficiency
 - Minimal allocations in event processing
 - Reused data structures where possible
-- Efficient slice operations using Go 1.25 features
+- Efficient slice operations using Go 1.26 features
 - Zero-copy event payload handling
 
 ## Development Guidelines
 
 ### Code Style
-- Follow Go 1.25 conventions
+- Follow Go 1.26 conventions
 - Use `any` instead of `interface{}`
 - Prefer atomic operations over mutexes where possible
 - Implement proper error handling and validation

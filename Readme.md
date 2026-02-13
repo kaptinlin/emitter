@@ -1,10 +1,10 @@
 # Emitter: A Modern Go Event Emission Library
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/kaptinlin/emitter)](https://goreportcard.com/report/github.com/kaptinlin/emitter)
-[![Go Version](https://img.shields.io/badge/Go-1.25+-blue.svg)](https://golang.org/)
+[![Go Version](https://img.shields.io/badge/Go-1.26+-blue.svg)](https://golang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Emitter is a high-performance, thread-safe Go library for event management that leverages modern Go features (1.25). Built with atomic operations and optimized data structures for maximum performance and reliability.
+Emitter is a high-performance, thread-safe Go library for event management that leverages modern Go features (1.26). Built with atomic operations and optimized data structures for maximum performance and reliability.
 
 ## ✨ Features
 
@@ -16,11 +16,11 @@ Emitter is a high-performance, thread-safe Go library for event management that 
 - 🛠️ **Highly Customizable**: Custom error handlers, ID generators, panic recovery
 - 🔒 **Thread-Safe**: Designed for high-concurrency environments
 - 🧪 **Battle-Tested**: Comprehensive test suite including fuzz testing
-- 📦 **Go 1.25 Ready**: Uses latest Go features for optimal performance
+- 📦 **Go 1.26 Ready**: Uses latest Go features for optimal performance
 
 ## 📦 Installation
 
-**Requirements:** Go 1.25 or higher
+**Requirements:** Go 1.26 or higher
 
 ```sh
 go get -u github.com/kaptinlin/emitter
@@ -292,10 +292,10 @@ make clean
 
 ## ⚡ Performance Features
 
-Built with modern Go 1.25 features for maximum performance:
+Built with modern Go 1.26 features for maximum performance:
 
 - **Lock-Free Operations**: Uses `atomic.Bool` and `atomic.Pointer` for event state and handler storage
-- **Efficient Slice Operations**: Leverages Go 1.25 `slices` package with binary search for O(log n) listener removal
+- **Efficient Slice Operations**: Leverages Go 1.26 `slices` package with binary search for O(log n) listener removal
 - **Zero-Copy Event Handling**: Minimal memory allocations in hot paths
 - **Optimized Pattern Matching**: Fast-path optimization for exact matches and simple wildcards
 - **Built-in Functions**: Uses `min()`/`max()` for priority clamping (Go 1.21+)
