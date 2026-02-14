@@ -8,6 +8,8 @@ const (
 )
 
 // matchTopicPattern checks if the given subject matches the pattern with wildcards.
+// It uses a recursive algorithm to match pattern segments against subject segments,
+// supporting single wildcard (*) for one segment and multi-wildcard (**) for zero or more segments.
 func matchTopicPattern(pattern, subject string) bool {
 	// Fast path for exact match
 	if pattern == subject {

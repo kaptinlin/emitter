@@ -10,9 +10,8 @@ var (
 	ErrInvalidPriority  = errors.New("invalid priority")
 
 	// Runtime errors occur during event emission and listener execution.
-	ErrTopicNotFound          = errors.New("topic not found")
-	ErrListenerNotFound       = errors.New("listener not found")
-	ErrEventProcessingAborted = errors.New("event processing aborted")
+	ErrTopicNotFound    = errors.New("topic not found")
+	ErrListenerNotFound = errors.New("listener not found")
 
 	// Manager errors are related to the emitter lifecycle.
 	ErrEmitterClosed        = errors.New("emitter is closed")
