@@ -19,7 +19,6 @@ func TestPriorityOrdering(t *testing.T) {
 
 	// Helper function to subscribe to the emitter with synchronization.
 	subscribeWithPriority := func(priority Priority) {
-		wg.Add(1) // Increment the WaitGroup counter.
 		_, err := em.On(topic, func(e Event) error {
 			defer wg.Done() // Decrement the counter when the function completes.
 			mu.Lock()       // Lock the mutex to safely append to callOrder.
@@ -28,6 +27,7 @@ func TestPriorityOrdering(t *testing.T) {
 			return nil
 		}, WithPriority(priority))
 		require.NoError(t, err, "Error adding listener with priority %v", priority)
+		wg.Add(1) // Increment the WaitGroup counter after successful subscription.
 	}
 
 	// Set up listeners with different priorities.

@@ -54,19 +54,17 @@ func TestEmitMultipleEventsWithPool(t *testing.T) {
 	numConcurrentEvents := 10
 
 	var wg sync.WaitGroup
-	wg.Add(numConcurrentEvents)
 
 	var processingError error
 
 	_, err := emitter.On("testEvent", func(event Event) error {
 		time.Sleep(100 * time.Millisecond)
-		wg.Done()
 		return nil
 	})
 	require.NoError(t, err, "Error adding listener")
 
 	for range numConcurrentEvents {
-		go func() {
+		wg.Go(func() {
 			errChan := emitter.Emit("testEvent", nil)
 			for err := range errChan {
 				if err != nil {
@@ -74,7 +72,7 @@ func TestEmitMultipleEventsWithPool(t *testing.T) {
 					break
 				}
 			}
-		}()
+		})
 	}
 
 	wg.Wait()
