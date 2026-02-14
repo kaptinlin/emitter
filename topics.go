@@ -9,8 +9,8 @@ import (
 type Topic struct {
 	Name              string
 	mu                sync.RWMutex
-	listeners         map[string]*listenerItem // Map of listeners indexed by their ID.
-	sortedListenerIDs []string                 // Sorted list of listener IDs for priority-based iteration.
+	listeners         map[string]*listenerItem
+	sortedListenerIDs []string
 }
 
 // NewTopic creates a new Topic.
@@ -37,14 +37,15 @@ func (t *Topic) removeSortedListenerID(id string) {
 	}
 }
 
-// AddListener adds a new listener to the topic with a specified priority and returns an identifier for the listener.
+// AddListener adds a new listener to the topic with a specified priority
+// and returns an identifier for the listener.
 func (t *Topic) AddListener(id string, listener Listener, opts ...ListenerOption) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
 	item := &listenerItem{
 		listener: listener,
-		priority: Normal, // Default priority if none is specified
+		priority: Normal,
 	}
 
 	for _, opt := range opts {
@@ -79,13 +80,13 @@ func (t *Topic) Trigger(event Event) []error {
 	for _, id := range t.sortedListenerIDs {
 		item, ok := t.listeners[id]
 		if !ok {
-			continue // Listener was removed; skip it.
+			continue
 		}
 		if err := item.listener(event); err != nil {
 			errs = append(errs, err)
 		}
 		if event.IsAborted() {
-			break // Stop notifying listeners if the event is aborted.
+			break
 		}
 	}
 	return errs

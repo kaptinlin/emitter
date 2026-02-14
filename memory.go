@@ -6,17 +6,17 @@ import (
 	"sync/atomic"
 )
 
-// MemoryEmitter is an in-memory implementation of the Emitter interface. It provides
-// facilities for adding and removing listeners, emitting events, and configuring
-// the behavior of event handling within the application.
+// MemoryEmitter is an in-memory implementation of the Emitter interface.
+// It provides facilities for adding and removing listeners, emitting events,
+// and configuring the behavior of event handling within the application.
 type MemoryEmitter struct {
-	topics            sync.Map                                 // Stores topics with concurrent access support.
-	errorHandler      atomic.Pointer[func(Event, error) error] // Handles errors that occur during event handling.
-	idGenerator       atomic.Pointer[func() string]            // Generates unique IDs for listeners.
-	panicHandler      atomic.Pointer[func(any)]                // Handles panics that occur during event handling.
-	pool              Pool                                     // Manages concurrent execution of event handlers.
-	closed            atomic.Bool                              // Indicates whether the emitter is closed.
-	errChanBufferSize atomic.Int32                             // Size of the buffer for the error channel in Emit.
+	topics            sync.Map
+	errorHandler      atomic.Pointer[func(Event, error) error]
+	idGenerator       atomic.Pointer[func() string]
+	panicHandler      atomic.Pointer[func(any)]
+	pool              Pool
+	closed            atomic.Bool
+	errChanBufferSize atomic.Int32
 }
 
 // NewMemoryEmitter initializes a new MemoryEmitter with optional configuration options.
@@ -41,8 +41,9 @@ func NewMemoryEmitter(opts ...EmitterOption) *MemoryEmitter {
 	return m
 }
 
-// On subscribes a listener to a topic with the given name. Listener options can be specified
-// to configure the listener's behavior. It returns a unique ID for the listener and an error, if any.
+// On subscribes a listener to a topic with the given name.
+// Listener options can be specified to configure the listener's behavior.
+// It returns a unique ID for the listener and an error, if any.
 func (m *MemoryEmitter) On(topicName string, listener Listener, opts ...ListenerOption) (string, error) {
 	if listener == nil {
 		return "", ErrNilListener
@@ -58,8 +59,8 @@ func (m *MemoryEmitter) On(topicName string, listener Listener, opts ...Listener
 	return listenerID, nil
 }
 
-// Off unsubscribes a listener from a topic using the listener's unique ID. It returns
-// an error if the listener cannot be found or if there is a problem with unsubscribing.
+// Off unsubscribes a listener from a topic using the listener's unique ID.
+// It returns an error if the listener cannot be found or if there is a problem with unsubscribing.
 func (m *MemoryEmitter) Off(topicName string, listenerID string) error {
 	topic, err := m.GetTopic(topicName)
 	if err != nil {
@@ -97,8 +98,8 @@ func (m *MemoryEmitter) Emit(topicName string, payload any) <-chan error {
 	return errChan
 }
 
-// EmitSync dispatches an event synchronously to all subscribers of the event's topic and
-// collects any errors that occurred. This method will block until all notifications are completed.
+// EmitSync dispatches an event synchronously to all subscribers of the event's topic
+// and collects any errors that occurred. This method will block until all notifications are completed.
 func (m *MemoryEmitter) EmitSync(topicName string, payload any) []error {
 	if m.closed.Load() {
 		return []error{ErrEmitterClosed}
@@ -141,7 +142,8 @@ func (m *MemoryEmitter) handleEvents(topicName string, payload any, errorHandler
 	})
 }
 
-// GetTopic retrieves a topic by its name. If the topic does not exist, it returns an error.
+// GetTopic retrieves a topic by its name.
+// If the topic does not exist, it returns an error.
 func (m *MemoryEmitter) GetTopic(topicName string) (*Topic, error) {
 	topic, ok := m.topics.Load(topicName)
 	if !ok {
@@ -150,8 +152,9 @@ func (m *MemoryEmitter) GetTopic(topicName string) (*Topic, error) {
 	return topic.(*Topic), nil
 }
 
-// EnsureTopic retrieves or creates a new topic by its name. If the topic does not
-// exist, it is created and returned. This ensures that a topic is always available.
+// EnsureTopic retrieves or creates a new topic by its name.
+// If the topic does not exist, it is created and returned.
+// This ensures that a topic is always available.
 func (m *MemoryEmitter) EnsureTopic(topicName string) *Topic {
 	topic, _ := m.topics.LoadOrStore(topicName, NewTopic())
 	return topic.(*Topic)
@@ -192,8 +195,9 @@ func (m *MemoryEmitter) SetErrChanBufferSize(size int) {
 	m.errChanBufferSize.Store(int32(size))
 }
 
-// Close terminates the emitter, ensuring all pending events are processed. It performs cleanup
-// and releases resources. Calling Close on an already closed emitter will result in an error.
+// Close terminates the emitter, ensuring all pending events are processed.
+// It performs cleanup and releases resources.
+// Calling Close on an already closed emitter will result in an error.
 func (m *MemoryEmitter) Close() error {
 	if m.closed.Load() {
 		return ErrEmitterAlreadyClosed

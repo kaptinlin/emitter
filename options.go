@@ -14,12 +14,13 @@ var DefaultErrorHandler = func(event Event, err error) error {
 }
 
 // DefaultIDGenerator generates a unique identifier using cryptographically secure random text.
-// Uses crypto/rand.Text (Go 1.24+) which returns a base32-encoded string with at least 128 bits of randomness.
+// Uses crypto/rand.Text (Go 1.24+) which returns a base32-encoded string
+// with at least 128 bits of randomness.
 var DefaultIDGenerator = func() string {
 	return rand.Text()
 }
 
-// DefaultPanicHandler is the default panic handler that prints the panic value to stdout.
+// DefaultPanicHandler is the default panic handler that prints the panic value.
 var DefaultPanicHandler = func(p any) {
 	fmt.Printf("Panic occurred: %v\n", p)
 }
@@ -55,7 +56,8 @@ func WithPanicHandler(panicHandler PanicHandler) EmitterOption {
 	}
 }
 
-// WithErrChanBufferSize sets the buffer size for the error channel returned by [Emitter.Emit].
+// WithErrChanBufferSize sets the buffer size for the error channel
+// returned by [Emitter.Emit].
 func WithErrChanBufferSize(size int) EmitterOption {
 	return func(m Emitter) {
 		m.SetErrChanBufferSize(size)

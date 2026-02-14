@@ -9,7 +9,8 @@ const (
 
 // matchTopicPattern checks if the given subject matches the pattern with wildcards.
 // It uses a recursive algorithm to match pattern segments against subject segments,
-// supporting single wildcard (*) for one segment and multi-wildcard (**) for zero or more segments.
+// supporting single wildcard (*) for one segment and multi-wildcard (**)
+// for zero or more segments.
 func matchTopicPattern(pattern, subject string) bool {
 	// Fast path for exact match
 	if pattern == subject {
@@ -29,7 +30,7 @@ func matchTopicPattern(pattern, subject string) bool {
 	patternParts := strings.Split(pattern, ".")
 	subjectParts := strings.Split(subject, ".")
 
-	// Handle the case where pattern ends with ".**", it should not match just "event"
+	// Handle the case where pattern ends with ".**"; it should not match just "event"
 	if len(patternParts) > 1 &&
 		patternParts[len(patternParts)-1] == MultiWildcard &&
 		len(subjectParts) == 1 &&
@@ -39,11 +40,12 @@ func matchTopicPattern(pattern, subject string) bool {
 
 	var matchParts func(p, s int) bool
 	matchParts = func(p, s int) bool {
-		// If we've reached the end of pattern parts and subject parts simultaneously, it's a match.
+		// If we've reached the end of both pattern and subject parts, it's a match.
 		if p == len(patternParts) && s == len(subjectParts) {
 			return true
 		}
-		// If we've reached the end of the subject but the pattern has remaining parts (other than '**'), it's not a match.
+		// If we've reached the end of the subject but the pattern has remaining parts
+		// (other than '**'), it's not a match.
 		if s == len(subjectParts) {
 			for i := p; i < len(patternParts); i++ {
 				if patternParts[i] != MultiWildcard {
