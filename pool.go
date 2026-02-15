@@ -25,17 +25,6 @@ func NewPondPool(maxWorkers, maxCapacity int, options ...pond.Option) *PondPool 
 	}
 }
 
-// Submit enqueues a task for execution in the pool.
-func (p *PondPool) Submit(task func()) {
-	p.pool.Submit(task)
-}
-
-// Running returns the number of currently active workers.
-func (p *PondPool) Running() int {
-	return p.pool.RunningWorkers()
-}
-
-// Release stops the pool and waits for all tasks to complete.
-func (p *PondPool) Release() {
-	p.pool.StopAndWait()
-}
+func (p *PondPool) Submit(task func()) { p.pool.Submit(task) }
+func (p *PondPool) Running() int       { return p.pool.RunningWorkers() }
+func (p *PondPool) Release()           { p.pool.StopAndWait() }

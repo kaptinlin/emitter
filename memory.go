@@ -6,9 +6,7 @@ import (
 	"sync/atomic"
 )
 
-// MemoryEmitter is an in-memory implementation of the Emitter interface.
-// It provides facilities for adding and removing listeners, emitting events,
-// and configuring the behavior of event handling within the application.
+// MemoryEmitter is an in-memory, thread-safe implementation of the [Emitter] interface.
 type MemoryEmitter struct {
 	topics            sync.Map
 	errorHandler      atomic.Pointer[func(Event, error) error]
@@ -20,11 +18,9 @@ type MemoryEmitter struct {
 }
 
 // NewMemoryEmitter initializes a new MemoryEmitter with optional configuration options.
-// Default configurations are applied, which can be overridden by the provided options.
 func NewMemoryEmitter(opts ...EmitterOption) *MemoryEmitter {
 	m := &MemoryEmitter{}
 
-	// Set default handlers using atomic pointers
 	errorHandler := DefaultErrorHandler
 	idGenerator := DefaultIDGenerator
 	panicHandler := DefaultPanicHandler
@@ -33,7 +29,6 @@ func NewMemoryEmitter(opts ...EmitterOption) *MemoryEmitter {
 	m.panicHandler.Store(&panicHandler)
 	m.errChanBufferSize.Store(10)
 
-	// Apply each provided option to the emitter to configure it.
 	for _, opt := range opts {
 		opt(m)
 	}
@@ -42,7 +37,6 @@ func NewMemoryEmitter(opts ...EmitterOption) *MemoryEmitter {
 }
 
 // On subscribes a listener to a topic with the given name.
-// Listener options can be specified to configure the listener's behavior.
 // It returns a unique ID for the listener and an error, if any.
 func (m *MemoryEmitter) On(topicName string, listener Listener, opts ...ListenerOption) (string, error) {
 	if listener == nil {
@@ -60,7 +54,6 @@ func (m *MemoryEmitter) On(topicName string, listener Listener, opts ...Listener
 }
 
 // Off unsubscribes a listener from a topic using the listener's unique ID.
-// It returns an error if the listener cannot be found or if there is a problem with unsubscribing.
 func (m *MemoryEmitter) Off(topicName string, listenerID string) error {
 	topic, err := m.GetTopic(topicName)
 	if err != nil {
@@ -70,12 +63,11 @@ func (m *MemoryEmitter) Off(topicName string, listenerID string) error {
 	return topic.RemoveListener(listenerID)
 }
 
-// Emit asynchronously dispatches an event to all the subscribers of the event's topic.
+// Emit asynchronously dispatches an event to all subscribers of the topic.
 // It returns a channel that will receive any errors encountered during event handling.
 func (m *MemoryEmitter) Emit(topicName string, payload any) <-chan error {
 	errChan := make(chan error, m.errChanBufferSize.Load())
 
-	// Before starting new goroutine, check if Emitter is closed
 	if m.closed.Load() {
 		errChan <- ErrEmitterClosed
 		close(errChan)
@@ -98,8 +90,8 @@ func (m *MemoryEmitter) Emit(topicName string, payload any) <-chan error {
 	return errChan
 }
 
-// EmitSync dispatches an event synchronously to all subscribers of the event's topic
-// and collects any errors that occurred. This method will block until all notifications are completed.
+// EmitSync dispatches an event synchronously to all subscribers of the topic.
+// This method blocks until all listeners have been notified.
 func (m *MemoryEmitter) EmitSync(topicName string, payload any) []error {
 	if m.closed.Load() {
 		return []error{ErrEmitterClosed}
@@ -112,9 +104,9 @@ func (m *MemoryEmitter) EmitSync(topicName string, payload any) []error {
 	return errs
 }
 
-// handleEvents is an internal method that processes an event and notifies all
-// registered listeners. It takes care of error handling and panic recovery.
-func (m *MemoryEmitter) handleEvents(topicName string, payload any, errorHandler func(error)) {
+// handleEvents processes an event and notifies all matching listeners,
+// with error handling and panic recovery.
+func (m *MemoryEmitter) handleEvents(topicName string, payload any, onError func(error)) {
 	defer func() {
 		if r := recover(); r != nil {
 			if handler := m.panicHandler.Load(); handler != nil {
@@ -126,24 +118,24 @@ func (m *MemoryEmitter) handleEvents(topicName string, payload any, errorHandler
 	event := NewBaseEvent(topicName, payload)
 	m.topics.Range(func(key, value any) bool {
 		topicPattern := key.(string)
-		if matchTopicPattern(topicPattern, topicName) {
-			topic := value.(*Topic)
-			topicErrors := topic.Trigger(event)
-			for _, err := range topicErrors {
-				if handler := m.errorHandler.Load(); handler != nil {
-					err = (*handler)(event, err)
-				}
-				if err != nil {
-					errorHandler(err)
-				}
+		if !matchTopicPattern(topicPattern, topicName) {
+			return true
+		}
+
+		topic := value.(*Topic)
+		for _, err := range topic.Trigger(event) {
+			if handler := m.errorHandler.Load(); handler != nil {
+				err = (*handler)(event, err)
+			}
+			if err != nil {
+				onError(err)
 			}
 		}
 		return true
 	})
 }
 
-// GetTopic retrieves a topic by its name.
-// If the topic does not exist, it returns an error.
+// GetTopic retrieves a topic by name.
 func (m *MemoryEmitter) GetTopic(topicName string) (*Topic, error) {
 	topic, ok := m.topics.Load(topicName)
 	if !ok {
@@ -152,9 +144,7 @@ func (m *MemoryEmitter) GetTopic(topicName string) (*Topic, error) {
 	return topic.(*Topic), nil
 }
 
-// EnsureTopic retrieves or creates a new topic by its name.
-// If the topic does not exist, it is created and returned.
-// This ensures that a topic is always available.
+// EnsureTopic retrieves an existing topic or creates a new one.
 func (m *MemoryEmitter) EnsureTopic(topicName string) *Topic {
 	topic, _ := m.topics.LoadOrStore(topicName, NewTopic())
 	return topic.(*Topic)
@@ -185,7 +175,7 @@ func (m *MemoryEmitter) SetPool(p Pool) {
 // A nil handler is ignored; the previous handler remains active.
 func (m *MemoryEmitter) SetPanicHandler(handler PanicHandler) {
 	if handler != nil {
-		fn := func(p any) { handler(p) }
+		fn := (func(any))(handler)
 		m.panicHandler.Store(&fn)
 	}
 }
@@ -195,17 +185,14 @@ func (m *MemoryEmitter) SetErrChanBufferSize(size int) {
 	m.errChanBufferSize.Store(int32(size))
 }
 
-// Close terminates the emitter, ensuring all pending events are processed.
-// It performs cleanup and releases resources.
-// Calling Close on an already closed emitter will result in an error.
+// Close terminates the emitter and releases resources.
+// Calling Close on an already closed emitter returns an error.
 func (m *MemoryEmitter) Close() error {
 	if m.closed.Load() {
 		return ErrEmitterAlreadyClosed
 	}
 
 	m.closed.Store(true)
-
-	// Perform cleanup operations
 	m.topics.Clear()
 
 	if m.pool != nil {

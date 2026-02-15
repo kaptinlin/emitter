@@ -20,11 +20,10 @@ func NewTopic() *Topic {
 	}
 }
 
-// addSortedListenerID inserts a listener ID into the sorted slice at the correct position.
-// Listeners are sorted in descending priority order (highest first).
+// addSortedListenerID inserts a listener ID at the correct position,
+// maintaining descending priority order (highest first).
 func (t *Topic) addSortedListenerID(id string, priority Priority) {
 	index, _ := slices.BinarySearchFunc(t.sortedListenerIDs, priority, func(existingID string, target Priority) int {
-		// Negate to maintain descending order: higher priority comes first.
 		return int(target) - int(t.listeners[existingID].priority)
 	})
 	t.sortedListenerIDs = slices.Insert(t.sortedListenerIDs, index, id)
@@ -37,8 +36,7 @@ func (t *Topic) removeSortedListenerID(id string) {
 	}
 }
 
-// AddListener adds a new listener to the topic with a specified priority
-// and returns an identifier for the listener.
+// AddListener adds a new listener to the topic with optional configuration.
 func (t *Topic) AddListener(id string, listener Listener, opts ...ListenerOption) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -56,7 +54,7 @@ func (t *Topic) AddListener(id string, listener Listener, opts ...ListenerOption
 	t.addSortedListenerID(id, item.priority)
 }
 
-// RemoveListener removes a listener from the topic using its identifier.
+// RemoveListener removes a listener from the topic by its ID.
 func (t *Topic) RemoveListener(id string) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -71,7 +69,7 @@ func (t *Topic) RemoveListener(id string) error {
 	return nil
 }
 
-// Trigger calls all listeners of the topic with the event.
+// Trigger calls all listeners in priority order and returns any errors.
 func (t *Topic) Trigger(event Event) []error {
 	t.mu.RLock()
 	defer t.mu.RUnlock()

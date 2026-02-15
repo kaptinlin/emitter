@@ -11,14 +11,15 @@ type Event interface {
 	IsAborted() bool
 }
 
-// BaseEvent provides a basic implementation of the Event interface.
+// BaseEvent provides a thread-safe implementation of the [Event] interface
+// using atomic operations for payload and abort state.
 type BaseEvent struct {
 	topic   string
 	payload atomic.Pointer[any]
 	aborted atomic.Bool
 }
 
-// NewBaseEvent creates a new instance of BaseEvent with a payload.
+// NewBaseEvent creates a new BaseEvent with the given topic and payload.
 func NewBaseEvent(topic string, payload any) *BaseEvent {
 	e := &BaseEvent{
 		topic: topic,
@@ -27,12 +28,10 @@ func NewBaseEvent(topic string, payload any) *BaseEvent {
 	return e
 }
 
-// Topic returns the event's topic.
 func (e *BaseEvent) Topic() string {
 	return e.topic
 }
 
-// Payload returns the event's payload.
 func (e *BaseEvent) Payload() any {
 	if p := e.payload.Load(); p != nil {
 		return *p
@@ -40,17 +39,14 @@ func (e *BaseEvent) Payload() any {
 	return nil
 }
 
-// SetPayload sets the event's payload.
 func (e *BaseEvent) SetPayload(payload any) {
 	e.payload.Store(&payload)
 }
 
-// SetAborted sets the event's aborted status.
 func (e *BaseEvent) SetAborted(abort bool) {
 	e.aborted.Store(abort)
 }
 
-// IsAborted checks the event's aborted status.
 func (e *BaseEvent) IsAborted() bool {
 	return e.aborted.Load()
 }

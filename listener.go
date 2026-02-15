@@ -16,7 +16,6 @@ type ListenerOption func(*listenerItem)
 // Invalid priorities are clamped to the valid range [Lowest, Highest].
 func WithPriority(priority Priority) ListenerOption {
 	return func(item *listenerItem) {
-		// Validate priority and use boundary values if out of range
 		item.priority = max(Lowest, min(priority, Highest))
 	}
 }
