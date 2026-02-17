@@ -2,7 +2,7 @@ package emitter
 
 import "sync/atomic"
 
-// Event is an interface representing the structure of an event.
+// Event represents the structure of an event with topic, payload, and abort state.
 type Event interface {
 	Topic() string
 	Payload() any
@@ -28,10 +28,12 @@ func NewBaseEvent(topic string, payload any) *BaseEvent {
 	return e
 }
 
+// Topic returns the event's topic name.
 func (e *BaseEvent) Topic() string {
 	return e.topic
 }
 
+// Payload returns the event's payload data.
 func (e *BaseEvent) Payload() any {
 	if p := e.payload.Load(); p != nil {
 		return *p
@@ -39,14 +41,17 @@ func (e *BaseEvent) Payload() any {
 	return nil
 }
 
+// SetPayload updates the event's payload.
 func (e *BaseEvent) SetPayload(payload any) {
 	e.payload.Store(&payload)
 }
 
+// SetAborted sets the abort state of the event.
 func (e *BaseEvent) SetAborted(abort bool) {
 	e.aborted.Store(abort)
 }
 
+// IsAborted reports whether the event has been aborted.
 func (e *BaseEvent) IsAborted() bool {
 	return e.aborted.Load()
 }

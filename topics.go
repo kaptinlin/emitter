@@ -6,6 +6,7 @@ import (
 )
 
 // Topic represents an event channel to which listeners can subscribe.
+// It maintains listeners in priority-sorted order for efficient execution.
 type Topic struct {
 	Name              string
 	mu                sync.RWMutex
@@ -13,7 +14,7 @@ type Topic struct {
 	sortedListenerIDs []string
 }
 
-// NewTopic creates a new Topic.
+// NewTopic creates a new Topic with initialized listener storage.
 func NewTopic() *Topic {
 	return &Topic{
 		listeners: make(map[string]*listenerItem),
@@ -69,7 +70,8 @@ func (t *Topic) RemoveListener(id string) error {
 	return nil
 }
 
-// Trigger calls all listeners in priority order and returns any errors.
+// Trigger calls all listeners in priority order (highest first) and returns any errors.
+// Execution stops if the event is aborted.
 func (t *Topic) Trigger(event Event) []error {
 	t.mu.RLock()
 	defer t.mu.RUnlock()

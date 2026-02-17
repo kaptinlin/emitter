@@ -7,7 +7,7 @@ const (
 	MultiWildcard  = "**" // Matches zero or more topic segments.
 )
 
-// matchTopicPattern checks if the subject matches the pattern with wildcards.
+// matchTopicPattern reports whether the subject matches the pattern with wildcards.
 // Supports single wildcard (*) for one segment and multi-wildcard (**)
 // for zero or more segments. Segments are separated by dots.
 func matchTopicPattern(pattern, subject string) bool {
@@ -72,7 +72,7 @@ func matchTopicPattern(pattern, subject string) bool {
 	return matchParts(0, 0)
 }
 
-// isValidTopicName checks whether the given topic name is valid.
+// isValidTopicName reports whether the given topic name is valid.
 // Empty strings and strings containing regex-like characters are rejected.
 func isValidTopicName(topicName string) bool {
 	return topicName != "" && !strings.ContainsAny(topicName, "?[")
