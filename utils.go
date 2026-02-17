@@ -20,10 +20,6 @@ func matchTopicPattern(pattern, subject string) bool {
 		return pattern == SingleWildcard || pattern == MultiWildcard
 	}
 
-	if pattern == SingleWildcard && subject == "" {
-		return true
-	}
-
 	patternParts := strings.Split(pattern, ".")
 	subjectParts := strings.Split(subject, ".")
 

@@ -116,6 +116,7 @@ func (m *MemoryEmitter) handleEvents(topicName string, payload any, onError func
 	}()
 
 	event := NewBaseEvent(topicName, payload)
+	errorHandler := m.errorHandler.Load()
 	m.topics.Range(func(key, value any) bool {
 		topicPattern := key.(string)
 		if !matchTopicPattern(topicPattern, topicName) {
@@ -124,8 +125,8 @@ func (m *MemoryEmitter) handleEvents(topicName string, payload any, onError func
 
 		topic := value.(*Topic)
 		for _, err := range topic.Trigger(event) {
-			if handler := m.errorHandler.Load(); handler != nil {
-				err = (*handler)(event, err)
+			if errorHandler != nil {
+				err = (*errorHandler)(event, err)
 			}
 			if err != nil {
 				onError(err)
@@ -175,7 +176,7 @@ func (m *MemoryEmitter) SetPool(p Pool) {
 // A nil handler is ignored; the previous handler remains active.
 func (m *MemoryEmitter) SetPanicHandler(handler PanicHandler) {
 	if handler != nil {
-		fn := (func(any))(handler)
+		fn := func(v any) { handler(v) }
 		m.panicHandler.Store(&fn)
 	}
 }
@@ -188,11 +189,10 @@ func (m *MemoryEmitter) SetErrChanBufferSize(size int) {
 // Close terminates the emitter and releases resources.
 // Calling Close on an already closed emitter returns an error.
 func (m *MemoryEmitter) Close() error {
-	if m.closed.Load() {
+	if !m.closed.CompareAndSwap(false, true) {
 		return ErrEmitterAlreadyClosed
 	}
 
-	m.closed.Store(true)
 	m.topics.Clear()
 
 	if m.pool != nil {
