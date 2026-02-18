@@ -275,19 +275,19 @@ This handler ensures that panics are logged and managed without disrupting your 
 
 ```bash
 # Run all tests with race detection
-make test
+task test
 
 # Run fuzz tests
-make test-fuzz
+task test-fuzz
 
 # Lint code
-make lint
+task lint
 
 # Check for shadowed variables
-make vet-shadow
+task vet-shadow
 
 # Clean build artifacts
-make clean
+task clean
 ```
 
 ## ⚡ Performance Features
@@ -327,13 +327,13 @@ We welcome contributions! Here's how to get started:
 2. **Clone** your fork: `git clone https://github.com/yourusername/emitter.git`
 3. **Create** a feature branch: `git checkout -b feature/amazing-feature`
 4. **Make** your changes and add tests
-5. **Run** tests: `make test`
+5. **Run** tests: `task test`
 6. **Commit** your changes: `git commit -m 'Add amazing feature'`
 7. **Push** to the branch: `git push origin feature/amazing-feature`
 8. **Open** a Pull Request
 
 Please ensure your code:
-- Follows Go conventions and passes `make lint`
+- Follows Go conventions and passes `task lint`
 - Includes appropriate tests
 - Updates documentation as needed
 
