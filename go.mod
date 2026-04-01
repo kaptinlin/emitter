@@ -1,6 +1,6 @@
 module github.com/kaptinlin/emitter
 
-go 1.26
+go 1.26.1
 
 require (
 	github.com/alitto/pond v1.9.2
