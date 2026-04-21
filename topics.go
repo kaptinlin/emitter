@@ -1,6 +1,7 @@
 package emitter
 
 import (
+	"cmp"
 	"slices"
 	"sync"
 )
@@ -37,7 +38,7 @@ func (t *Topic) AddListener(id string, listener Listener, opts ...ListenerOption
 
 	t.listeners[id] = item
 	index, _ := slices.BinarySearchFunc(t.sortedListenerIDs, item.priority, func(existingID string, target Priority) int {
-		return int(target) - int(t.listeners[existingID].priority)
+		return cmp.Compare(int(target), int(t.listeners[existingID].priority))
 	})
 	t.sortedListenerIDs = slices.Insert(t.sortedListenerIDs, index, id)
 }
