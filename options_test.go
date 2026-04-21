@@ -155,3 +155,97 @@ func TestWithIDGenerator(t *testing.T) {
 	// Check if the returned ID matches the custom ID.
 	assert.Equal(t, customID, returnedID, "Expected ID to match custom ID")
 }
+
+func TestWithErrChanBufferSize(t *testing.T) {
+	t.Parallel()
+
+	emitter := NewMemoryEmitter(WithErrChanBufferSize(2))
+	listenerErr := errors.New("listener error")
+
+	for i := range 2 {
+		_, err := emitter.On("testTopic", func(Event) error {
+			return listenerErr
+		})
+		require.NoError(t, err, "On() failed for listener %d", i)
+	}
+
+	errChan := emitter.Emit("testTopic", "testPayload")
+	var errs []error
+	for err := range errChan {
+		errs = append(errs, err)
+	}
+
+	require.Len(t, errs, 2)
+	for _, err := range errs {
+		assert.ErrorIs(t, err, listenerErr)
+	}
+}
+
+func TestSetErrChanBufferSizeClampsNegativeValues(t *testing.T) {
+	t.Parallel()
+
+	emitter := NewMemoryEmitter()
+	emitter.SetErrChanBufferSize(-1)
+
+	listenerErr := errors.New("listener error")
+	_, err := emitter.On("testTopic", func(Event) error {
+		return listenerErr
+	})
+	require.NoError(t, err)
+
+	errChan := emitter.Emit("testTopic", "testPayload")
+	assert.Zero(t, cap(errChan))
+
+	var errs []error
+	for err := range errChan {
+		errs = append(errs, err)
+	}
+	if assert.Len(t, errs, 1) {
+		assert.ErrorIs(t, errs[0], listenerErr)
+	}
+}
+
+func TestSetErrorHandlerNilKeepsExistingHandler(t *testing.T) {
+	t.Parallel()
+
+	emitter := NewMemoryEmitter()
+	handledErr := errors.New("handled error")
+	emitter.SetErrorHandler(func(Event, error) error {
+		return handledErr
+	})
+	emitter.SetErrorHandler(nil)
+
+	_, err := emitter.On("testTopic", func(Event) error {
+		return errTestCustomError
+	})
+	require.NoError(t, err)
+
+	errChan := emitter.Emit("testTopic", "testPayload")
+	var errs []error
+	for err := range errChan {
+		errs = append(errs, err)
+	}
+	if assert.Len(t, errs, 1) {
+		assert.ErrorIs(t, errs[0], handledErr)
+	}
+}
+
+func TestSetIDGeneratorNilKeepsExistingGenerator(t *testing.T) {
+	t.Parallel()
+
+	emitter := NewMemoryEmitter()
+	emitter.SetIDGenerator(func() string { return "custom-id" })
+	emitter.SetIDGenerator(nil)
+
+	returnedID, err := emitter.On("testTopic", func(Event) error { return nil })
+	require.NoError(t, err)
+	assert.Equal(t, "custom-id", returnedID)
+}
+
+func TestDefaultHandlers(t *testing.T) {
+	t.Parallel()
+
+	err := errors.New("listener error")
+	assert.Same(t, err, DefaultErrorHandler(NewBaseEvent("testTopic", nil), err))
+	assert.NotEmpty(t, DefaultIDGenerator())
+}

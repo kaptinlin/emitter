@@ -69,8 +69,8 @@ func TestRemoveListenerPreservesPriorityOrder(t *testing.T) {
 	err := topic.RemoveListener("normal")
 	require.NoError(t, err)
 
-	errs := topic.Trigger(NewBaseEvent("test", nil))
-	require.Empty(t, errs)
+	errList := topic.Trigger(NewBaseEvent("test", nil))
+	require.Empty(t, errList)
 	assert.Equal(t, []string{"highest", "low"}, callOrder)
 }
 
@@ -90,10 +90,63 @@ func TestTriggerListeners(t *testing.T) {
 	var wg sync.WaitGroup
 
 	wg.Go(func() {
-		errors := topic.Trigger(event)
-		require.Len(t, errors, 1, "Trigger() should return exactly 1 error")
-		assert.Equal(t, "listener error 2: listener error base", errors[0].Error())
+		errList := topic.Trigger(event)
+		require.Len(t, errList, 1, "Trigger() should return exactly 1 error")
+		assert.ErrorIs(t, errList[0], errListenerBase)
 	})
 
 	wg.Wait()
+}
+
+func TestRemoveListenerMissing(t *testing.T) {
+	t.Parallel()
+
+	topic := NewTopic()
+	assert.ErrorIs(t, topic.RemoveListener("missing"), ErrListenerNotFound)
+}
+
+func TestTriggerStopsAfterAbort(t *testing.T) {
+	t.Parallel()
+
+	topic := NewTopic()
+	var callOrder []string
+
+	topic.AddListener("first", func(e Event) error {
+		callOrder = append(callOrder, "first")
+		e.SetAborted(true)
+		return nil
+	}, WithPriority(High))
+	topic.AddListener("second", func(Event) error {
+		callOrder = append(callOrder, "second")
+		return nil
+	}, WithPriority(Low))
+
+	errList := topic.Trigger(NewBaseEvent("test", nil))
+	require.Empty(t, errList)
+	assert.Equal(t, []string{"first"}, callOrder)
+}
+
+func TestTriggerRecoversPanicAsPanicError(t *testing.T) {
+	t.Parallel()
+
+	topic := NewTopic()
+	topic.AddListener("panic", func(Event) error {
+		panic(errListenerBase)
+	})
+
+	errList := topic.Trigger(NewBaseEvent("test", nil))
+	require.Len(t, errList, 1)
+	assert.ErrorIs(t, errList[0], ErrListenerPanic)
+	assert.ErrorIs(t, errList[0], errListenerBase)
+
+	var panicErr *PanicError
+	require.ErrorAs(t, errList[0], &panicErr)
+	assert.Equal(t, errListenerBase, panicErr.Value)
+}
+
+func TestWildcardConstants(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, "*", SingleWildcard)
+	assert.Equal(t, "**", MultiWildcard)
 }

@@ -138,3 +138,77 @@ func TestEmitWithAbort(t *testing.T) {
 	// Check that there were no errors during emission.
 	assert.Empty(t, emitErrors, "Emit() resulted in errors")
 }
+
+func TestPriorityIsValid(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		priority Priority
+		want     bool
+	}{
+		{name: "lowest", priority: Lowest, want: true},
+		{name: "highest", priority: Highest, want: true},
+		{name: "below lowest", priority: Lowest - 1, want: false},
+		{name: "above highest", priority: Highest + 1, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, tt.priority.IsValid())
+		})
+	}
+}
+
+func TestWithPriorityClampsOutOfRangeValues(t *testing.T) {
+	t.Parallel()
+
+	emitter := NewMemoryEmitter()
+	var callOrder []Priority
+
+	_, err := emitter.On("testTopic", func(Event) error {
+		callOrder = append(callOrder, Highest)
+		return nil
+	}, WithPriority(Highest+10))
+	require.NoError(t, err)
+
+	_, err = emitter.On("testTopic", func(Event) error {
+		callOrder = append(callOrder, Lowest)
+		return nil
+	}, WithPriority(Lowest-10))
+	require.NoError(t, err)
+
+	errors := emitter.EmitSync("testTopic", nil)
+	require.Empty(t, errors)
+	assert.Equal(t, []Priority{Highest, Lowest}, callOrder)
+}
+
+func TestDefaultPriorityIsNormal(t *testing.T) {
+	t.Parallel()
+
+	emitter := NewMemoryEmitter()
+	var callOrder []Priority
+
+	_, err := emitter.On("testTopic", func(Event) error {
+		callOrder = append(callOrder, Normal)
+		return nil
+	})
+	require.NoError(t, err)
+
+	_, err = emitter.On("testTopic", func(Event) error {
+		callOrder = append(callOrder, Low)
+		return nil
+	}, WithPriority(Low))
+	require.NoError(t, err)
+
+	errors := emitter.EmitSync("testTopic", nil)
+	require.Empty(t, errors)
+	assert.Equal(t, []Priority{Normal, Low}, callOrder)
+}
+
+func TestErrInvalidPrioritySentinel(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, "invalid priority", ErrInvalidPriority.Error())
+}

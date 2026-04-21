@@ -23,6 +23,7 @@ go.work.sum
 
 # IntelliJ files
 .idea/
+.vscode/
 
 # Coverage files
 cover.out
@@ -39,6 +40,7 @@ build/
 
 # .ralphy
 .ralphy/deferred.json
+.ralphy/*.json
 .ralphy/*.txt
 
 # todo files
@@ -46,20 +48,27 @@ build/
 TODO.md
 
 # Project-specific
-.claude/.DS_Store
+.claude/
 coverage*.**
 coverage/
 release/
 
 # Scratch/planning docs
+.plan/*.md
 .plans/
+.plans/*
 reports/
+reports/*
+plan*.md
 PLAN*.md
+improve*.md
 IMPROVE.md
 IMPROVE*.md
+refactor*.md
 REFACTOR.md
 REFACTOR*.md
 ANALYSIS.md
+TODO*.md
 
 # Meeting records
 .meetings/

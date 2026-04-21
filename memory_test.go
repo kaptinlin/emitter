@@ -15,9 +15,6 @@ import (
 
 var errTestListenerError = errors.New("listener error")
 
-// Virtual time tests using synctest (Go 1.25+)
-// These tests provide deterministic concurrent testing without relying on real time.
-
 // TestPriorityOrderingWithDelays tests that listener priority is respected
 // even when listeners have different execution delays.
 func TestPriorityOrderingWithDelays(t *testing.T) {
@@ -473,6 +470,51 @@ func TestMemoryEmitterClose(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("Test timed out waiting for the error to be received")
 	}
+}
+
+func TestMemoryEmitterCloseTwice(t *testing.T) {
+	t.Parallel()
+
+	emitter := NewMemoryEmitter()
+	require.NoError(t, emitter.Close())
+	require.ErrorIs(t, emitter.Close(), ErrEmitterAlreadyClosed)
+
+	errList := emitter.EmitSync("topic", "payload")
+	require.Len(t, errList, 1)
+	require.ErrorIs(t, errList[0], ErrEmitterClosed)
+}
+
+func TestOnNilListener(t *testing.T) {
+	t.Parallel()
+
+	emitter := NewMemoryEmitter()
+	_, err := emitter.On("testTopic", nil)
+	require.ErrorIs(t, err, ErrNilListener)
+}
+
+func TestGetTopicMissing(t *testing.T) {
+	t.Parallel()
+
+	emitter := NewMemoryEmitter()
+	_, err := emitter.GetTopic("missing")
+	require.ErrorIs(t, err, ErrTopicNotFound)
+}
+
+func TestOffMissingTopic(t *testing.T) {
+	t.Parallel()
+
+	emitter := NewMemoryEmitter()
+	err := emitter.Off("missing", "listener")
+	require.ErrorIs(t, err, ErrTopicNotFound)
+}
+
+func TestOffMissingListener(t *testing.T) {
+	t.Parallel()
+
+	emitter := NewMemoryEmitter()
+	emitter.EnsureTopic("testTopic")
+	err := emitter.Off("testTopic", "missing")
+	require.ErrorIs(t, err, ErrListenerNotFound)
 }
 
 func createTestListener(received chan<- string) func(Event) error {

@@ -34,3 +34,14 @@ func TestBaseEventSetAbortedAndIsAborted(t *testing.T) {
 	event.SetAborted(false)
 	assert.False(t, event.IsAborted(), "BaseEvent.Abort(false) did not unabort the event")
 }
+
+func TestBaseEventSetPayload(t *testing.T) {
+	t.Parallel()
+
+	event := NewBaseEvent("test_topic", "initial")
+	event.SetPayload(map[string]string{"key": "updated"})
+
+	retrievedPayload, ok := event.Payload().(map[string]string)
+	require.True(t, ok, "Payload is not of type map[string]string")
+	assert.Equal(t, "updated", retrievedPayload["key"])
+}
