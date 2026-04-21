@@ -49,6 +49,31 @@ func TestAddRemoveListener(t *testing.T) {
 	assert.Empty(t, topic.listeners, "RemoveListener() failed to remove listener 2")
 }
 
+func TestRemoveListenerPreservesPriorityOrder(t *testing.T) {
+	topic := NewTopic()
+	callOrder := make([]string, 0, 2)
+
+	topic.AddListener("normal", func(Event) error {
+		callOrder = append(callOrder, "normal")
+		return nil
+	})
+	topic.AddListener("low", func(Event) error {
+		callOrder = append(callOrder, "low")
+		return nil
+	}, WithPriority(Low))
+	topic.AddListener("highest", func(Event) error {
+		callOrder = append(callOrder, "highest")
+		return nil
+	}, WithPriority(Highest))
+
+	err := topic.RemoveListener("normal")
+	require.NoError(t, err)
+
+	errs := topic.Trigger(NewBaseEvent("test", nil))
+	require.Empty(t, errs)
+	assert.Equal(t, []string{"highest", "low"}, callOrder)
+}
+
 func TestTriggerListeners(t *testing.T) {
 	topic := NewTopic()
 

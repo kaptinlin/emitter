@@ -21,22 +21,6 @@ func NewTopic() *Topic {
 	}
 }
 
-// addSortedListenerID inserts a listener ID at the correct position,
-// maintaining descending priority order (highest first).
-func (t *Topic) addSortedListenerID(id string, priority Priority) {
-	index, _ := slices.BinarySearchFunc(t.sortedListenerIDs, priority, func(existingID string, target Priority) int {
-		return int(target) - int(t.listeners[existingID].priority)
-	})
-	t.sortedListenerIDs = slices.Insert(t.sortedListenerIDs, index, id)
-}
-
-// removeSortedListenerID removes a listener ID from the sorted slice.
-func (t *Topic) removeSortedListenerID(id string) {
-	if idx := slices.Index(t.sortedListenerIDs, id); idx != -1 {
-		t.sortedListenerIDs = slices.Delete(t.sortedListenerIDs, idx, idx+1)
-	}
-}
-
 // AddListener adds a new listener to the topic with optional configuration.
 func (t *Topic) AddListener(id string, listener Listener, opts ...ListenerOption) {
 	t.mu.Lock()
@@ -52,7 +36,10 @@ func (t *Topic) AddListener(id string, listener Listener, opts ...ListenerOption
 	}
 
 	t.listeners[id] = item
-	t.addSortedListenerID(id, item.priority)
+	index, _ := slices.BinarySearchFunc(t.sortedListenerIDs, item.priority, func(existingID string, target Priority) int {
+		return int(target) - int(t.listeners[existingID].priority)
+	})
+	t.sortedListenerIDs = slices.Insert(t.sortedListenerIDs, index, id)
 }
 
 // RemoveListener removes a listener from the topic by its ID.
@@ -65,7 +52,9 @@ func (t *Topic) RemoveListener(id string) error {
 	}
 
 	delete(t.listeners, id)
-	t.removeSortedListenerID(id)
+	if idx := slices.Index(t.sortedListenerIDs, id); idx != -1 {
+		t.sortedListenerIDs = slices.Delete(t.sortedListenerIDs, idx, idx+1)
+	}
 
 	return nil
 }
