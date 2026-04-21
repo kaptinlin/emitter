@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 )
 
-// MemoryEmitter is an in-memory, thread-safe implementation of the [Emitter] interface.
+// MemoryEmitter is an in-memory [Emitter].
 type MemoryEmitter struct {
 	topics            sync.Map
 	errorHandler      atomic.Pointer[func(Event, error) error]
@@ -17,7 +17,7 @@ type MemoryEmitter struct {
 	errChanBufferSize atomic.Int32
 }
 
-// NewMemoryEmitter initializes a new MemoryEmitter with optional configuration options.
+// NewMemoryEmitter returns a [MemoryEmitter] configured with opts.
 func NewMemoryEmitter(opts ...EmitterOption) *MemoryEmitter {
 	m := &MemoryEmitter{}
 
@@ -34,8 +34,7 @@ func NewMemoryEmitter(opts ...EmitterOption) *MemoryEmitter {
 	return m
 }
 
-// On subscribes a listener to a topic with the given name.
-// It returns a unique ID for the listener and an error, if any.
+// On registers listener for topicName and returns its listener ID.
 func (m *MemoryEmitter) On(topicName string, listener Listener, opts ...ListenerOption) (string, error) {
 	if listener == nil {
 		return "", ErrNilListener
@@ -51,7 +50,7 @@ func (m *MemoryEmitter) On(topicName string, listener Listener, opts ...Listener
 	return listenerID, nil
 }
 
-// Off unsubscribes a listener from a topic using the listener's unique ID.
+// Off removes the listener identified by listenerID from topicName.
 func (m *MemoryEmitter) Off(topicName string, listenerID string) error {
 	topic, err := m.GetTopic(topicName)
 	if err != nil {
@@ -61,8 +60,7 @@ func (m *MemoryEmitter) Off(topicName string, listenerID string) error {
 	return topic.RemoveListener(listenerID)
 }
 
-// Emit asynchronously dispatches an event to all subscribers of the topic.
-// It returns a channel that will receive any errors encountered during event handling.
+// Emit emits payload to matching listeners and returns their errors.
 func (m *MemoryEmitter) Emit(topicName string, payload any) <-chan error {
 	errChan := make(chan error, m.errChanBufferSize.Load())
 
@@ -89,8 +87,7 @@ func (m *MemoryEmitter) Emit(topicName string, payload any) <-chan error {
 	return errChan
 }
 
-// EmitSync dispatches an event synchronously to all subscribers of the topic.
-// This method blocks until all listeners have been notified.
+// EmitSync emits payload to matching listeners and waits for completion.
 func (m *MemoryEmitter) EmitSync(topicName string, payload any) []error {
 	if m.closed.Load() {
 		return []error{ErrEmitterClosed}
@@ -103,7 +100,6 @@ func (m *MemoryEmitter) EmitSync(topicName string, payload any) []error {
 	return errs
 }
 
-// handleEvents processes an event and notifies all matching listeners.
 func (m *MemoryEmitter) handleEvents(topicName string, payload any, onError func(error)) {
 	event := NewBaseEvent(topicName, payload)
 	errorHandler := m.errorHandler.Load()
@@ -124,7 +120,7 @@ func (m *MemoryEmitter) handleEvents(topicName string, payload any, onError func
 	})
 }
 
-// GetTopic retrieves a topic by name.
+// GetTopic returns the topic registered as topicName.
 func (m *MemoryEmitter) GetTopic(topicName string) (*Topic, error) {
 	topic, ok := m.topics.Load(topicName)
 	if !ok {
@@ -133,14 +129,14 @@ func (m *MemoryEmitter) GetTopic(topicName string) (*Topic, error) {
 	return topic.(*Topic), nil
 }
 
-// EnsureTopic retrieves an existing topic or creates a new one.
+// EnsureTopic returns the topic registered as topicName, creating it if needed.
 func (m *MemoryEmitter) EnsureTopic(topicName string) *Topic {
 	topic, _ := m.topics.LoadOrStore(topicName, NewTopic())
 	return topic.(*Topic)
 }
 
-// SetErrorHandler assigns a custom error handler for the Emitter.
-// A nil handler is ignored; the previous handler remains active.
+// SetErrorHandler sets the handler used to rewrite listener errors.
+// A nil handler is ignored.
 func (m *MemoryEmitter) SetErrorHandler(handler func(Event, error) error) {
 	if handler == nil {
 		return
@@ -148,8 +144,8 @@ func (m *MemoryEmitter) SetErrorHandler(handler func(Event, error) error) {
 	m.errorHandler.Store(&handler)
 }
 
-// SetIDGenerator assigns a custom ID generator for new listeners.
-// A nil generator is ignored; the previous generator remains active.
+// SetIDGenerator sets the generator used for listener IDs.
+// A nil generator is ignored.
 func (m *MemoryEmitter) SetIDGenerator(generator func() string) {
 	if generator == nil {
 		return
@@ -157,12 +153,12 @@ func (m *MemoryEmitter) SetIDGenerator(generator func() string) {
 	m.idGenerator.Store(&generator)
 }
 
-// SetPool sets a custom goroutine pool for managing concurrent event handling.
+// SetPool sets the pool used by Emit.
 func (m *MemoryEmitter) SetPool(p Pool) {
 	m.pool = p
 }
 
-// SetErrChanBufferSize sets the size of the buffered channel for errors returned by [MemoryEmitter.Emit].
+// SetErrChanBufferSize sets the buffer size used by Emit error channels.
 func (m *MemoryEmitter) SetErrChanBufferSize(size int) {
 	if size < 0 {
 		size = 0
@@ -173,8 +169,8 @@ func (m *MemoryEmitter) SetErrChanBufferSize(size int) {
 	m.errChanBufferSize.Store(int32(size))
 }
 
-// Close terminates the emitter and releases resources.
-// Calling Close on an already closed emitter returns an error.
+// Close releases the emitter's resources.
+// Close returns ErrEmitterAlreadyClosed after the first call.
 func (m *MemoryEmitter) Close() error {
 	if !m.closed.CompareAndSwap(false, true) {
 		return ErrEmitterAlreadyClosed

@@ -2,24 +2,28 @@ package emitter
 
 import "sync/atomic"
 
-// Event represents the structure of an event with topic, payload, and abort state.
+// Event represents a value being emitted through a topic.
 type Event interface {
+	// Topic returns the event topic.
 	Topic() string
+	// Payload returns the event payload.
 	Payload() any
+	// SetPayload replaces the event payload.
 	SetPayload(any)
+	// SetAborted stops delivery to remaining listeners.
 	SetAborted(bool)
+	// IsAborted reports whether delivery has been stopped.
 	IsAborted() bool
 }
 
-// BaseEvent provides a thread-safe implementation of the [Event] interface
-// using atomic operations for payload and abort state.
+// BaseEvent is the default [Event] implementation.
 type BaseEvent struct {
 	topic   string
 	payload atomic.Pointer[any]
 	aborted atomic.Bool
 }
 
-// NewBaseEvent creates a new BaseEvent with the given topic and payload.
+// NewBaseEvent returns a [BaseEvent] for topic and payload.
 func NewBaseEvent(topic string, payload any) *BaseEvent {
 	e := &BaseEvent{
 		topic: topic,
@@ -28,12 +32,12 @@ func NewBaseEvent(topic string, payload any) *BaseEvent {
 	return e
 }
 
-// Topic returns the event's topic name.
+// Topic returns the event topic.
 func (e *BaseEvent) Topic() string {
 	return e.topic
 }
 
-// Payload returns the event's payload data.
+// Payload returns the event payload.
 func (e *BaseEvent) Payload() any {
 	if p := e.payload.Load(); p != nil {
 		return *p
@@ -41,17 +45,17 @@ func (e *BaseEvent) Payload() any {
 	return nil
 }
 
-// SetPayload updates the event's payload.
+// SetPayload replaces the event payload.
 func (e *BaseEvent) SetPayload(payload any) {
 	e.payload.Store(&payload)
 }
 
-// SetAborted sets the abort state of the event.
+// SetAborted stops delivery to remaining listeners.
 func (e *BaseEvent) SetAborted(abort bool) {
 	e.aborted.Store(abort)
 }
 
-// IsAborted reports whether the event has been aborted.
+// IsAborted reports whether delivery has been stopped.
 func (e *BaseEvent) IsAborted() bool {
 	return e.aborted.Load()
 }

@@ -1,9 +1,8 @@
 package emitter
 
-// Listener is a function type that can handle events of any type.
+// Listener handles an emitted event.
 type Listener func(Event) error
 
-// listenerItem stores a listener and its priority.
 type listenerItem struct {
 	listener Listener
 	priority Priority

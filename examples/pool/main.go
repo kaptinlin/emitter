@@ -10,28 +10,21 @@ import (
 )
 
 func main() {
-	// Initialize a goroutine pool with 5 workers and a maximum capacity of 1000 tasks
 	pool := emitter.NewPondPool(5, 1000)
-
-	// Create a new emitter instance using the custom pool
 	e := emitter.NewMemoryEmitter(emitter.WithPool(pool))
 
-	// Define a listener that simulates a time-consuming task
 	timeConsumingListener := func(evt emitter.Event) error {
 		fmt.Printf("Processing event: %s with payload: %v\n", evt.Topic(), evt.Payload())
-		// Simulate some work with a sleep
 		time.Sleep(2 * time.Second)
 		fmt.Printf("Finished processing event: %s\n", evt.Topic())
 		return nil
 	}
 
-	// Subscribe the listener to a topic
 	_, err := e.On("user.signup", timeConsumingListener)
 	if err != nil {
 		log.Fatalf("Failed to subscribe listener: %v", err)
 	}
 
-	// Emit several events concurrently
 	for i := range 10 {
 		go func() {
 			payload := fmt.Sprintf("User #%d", i)
@@ -39,10 +32,7 @@ func main() {
 		}()
 	}
 
-	// Wait for all events to be processed before shutting down
 	time.Sleep(10 * time.Second)
-
-	// Release the resources used by the pool
 	pool.Release()
 	fmt.Println("All events have been processed and the pool has been released.")
 }

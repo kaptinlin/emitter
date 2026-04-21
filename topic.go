@@ -6,23 +6,23 @@ import (
 	"sync"
 )
 
-// Topic represents an event channel to which listeners can subscribe.
-// It maintains listeners in priority-sorted order for efficient execution.
+// Topic stores the listeners registered for an event pattern.
 type Topic struct {
+	// Name is the topic or pattern associated with the topic.
 	Name              string
 	mu                sync.RWMutex
 	listeners         map[string]*listenerItem
 	sortedListenerIDs []string
 }
 
-// NewTopic creates a new Topic with initialized listener storage.
+// NewTopic returns an empty Topic.
 func NewTopic() *Topic {
 	return &Topic{
 		listeners: make(map[string]*listenerItem),
 	}
 }
 
-// AddListener adds a new listener to the topic with optional configuration.
+// AddListener registers listener under id.
 func (t *Topic) AddListener(id string, listener Listener, opts ...ListenerOption) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -43,7 +43,7 @@ func (t *Topic) AddListener(id string, listener Listener, opts ...ListenerOption
 	t.sortedListenerIDs = slices.Insert(t.sortedListenerIDs, index, id)
 }
 
-// RemoveListener removes a listener from the topic by its ID.
+// RemoveListener removes the listener identified by id.
 func (t *Topic) RemoveListener(id string) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -60,8 +60,7 @@ func (t *Topic) RemoveListener(id string) error {
 	return nil
 }
 
-// Trigger calls all listeners in priority order (highest first) and returns any errors.
-// Execution stops if the event is aborted.
+// Trigger delivers event in priority order until all listeners run or event is aborted.
 func (t *Topic) Trigger(event Event) []error {
 	t.mu.RLock()
 	defer t.mu.RUnlock()

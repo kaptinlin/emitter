@@ -1,15 +1,18 @@
 package emitter
 
-// Priority represents the execution order for event listeners.
-// Higher values execute first.
+// Priority controls listener execution order.
 type Priority int
 
-// Priority levels in ascending order from lowest to highest.
 const (
-	Lowest  Priority = 0
-	Low     Priority = 25
-	Normal  Priority = 50
-	High    Priority = 75
+	// Lowest is the lowest listener priority.
+	Lowest Priority = 0
+	// Low runs after Normal and above Lowest.
+	Low Priority = 25
+	// Normal is the default listener priority.
+	Normal Priority = 50
+	// High runs before Normal and below Highest.
+	High Priority = 75
+	// Highest is the highest listener priority.
 	Highest Priority = 100
 )
 

@@ -13,8 +13,6 @@ func main() {
 
 	fmt.Println("=== Listener Management Examples ===")
 	fmt.Println()
-
-	// Adding listeners
 	fmt.Println("--- Adding Listeners ---")
 
 	listener1 := func(evt emitter.Event) error {
@@ -32,7 +30,6 @@ func main() {
 		return nil
 	}
 
-	// Subscribe multiple listeners to the same topic
 	id1, err := e.On("notification", listener1)
 	if err != nil {
 		log.Fatalf("Failed to subscribe listener 1: %v", err)
@@ -51,11 +48,9 @@ func main() {
 	}
 	fmt.Printf("Listener 3 registered with ID: %s\n", id3)
 
-	// Emit to trigger all listeners
 	fmt.Println("\nEmitting notification event (all 3 listeners active):")
 	e.EmitSync("notification", nil)
 
-	// Removing a specific listener
 	fmt.Println("\n--- Removing Listener 2 ---")
 	err = e.Off("notification", id2)
 	if err != nil {
@@ -67,7 +62,6 @@ func main() {
 	fmt.Println("\nEmitting notification event (only listeners 1 and 3):")
 	e.EmitSync("notification", nil)
 
-	// Removing another listener
 	fmt.Println("\n--- Removing Listener 1 ---")
 	err = e.Off("notification", id1)
 	if err != nil {
@@ -79,14 +73,12 @@ func main() {
 	fmt.Println("\nEmitting notification event (only listener 3):")
 	e.EmitSync("notification", nil)
 
-	// Attempting to remove non-existent listener
 	fmt.Println("\n--- Attempting to Remove Non-existent Listener ---")
 	err = e.Off("notification", "non-existent-id")
 	if err != nil {
 		fmt.Printf("Expected error: %v\n", err)
 	}
 
-	// Priority-based listener execution
 	fmt.Println("\n--- Priority-based Listener Management ---")
 
 	highPriorityListener := func(evt emitter.Event) error {
@@ -104,7 +96,6 @@ func main() {
 		return nil
 	}
 
-	// Register listeners with different priorities
 	_, err = e.On("task", highPriorityListener, emitter.WithPriority(emitter.High))
 	if err != nil {
 		log.Fatalf("Failed to subscribe high priority listener: %v", err)
@@ -123,7 +114,6 @@ func main() {
 	fmt.Println("\nEmitting task event (listeners execute by priority):")
 	e.EmitSync("task", nil)
 
-	// Event abortion (stopping propagation)
 	fmt.Println("\n--- Event Abortion (Stopping Propagation) ---")
 
 	abortingListener := func(evt emitter.Event) error {
@@ -150,7 +140,6 @@ func main() {
 	fmt.Println("\nEmitting abortable event:")
 	e.EmitSync("abortable", nil)
 
-	// Clean up
 	err = e.Close()
 	if err != nil {
 		log.Printf("Error closing emitter: %v", err)

@@ -14,8 +14,6 @@ func main() {
 	fmt.Println("=== Wildcard Pattern Matching Examples ===")
 	fmt.Println()
 
-	// Single-level wildcard (*)
-	// Matches exactly one segment between dots
 	fmt.Println("--- Single-level Wildcard (*) ---")
 
 	singleWildcardListener := func(evt emitter.Event) error {
@@ -28,18 +26,13 @@ func main() {
 		log.Fatalf("Failed to subscribe: %v", err)
 	}
 
-	// These will match "order.*"
 	e.EmitSync("order.created", "Order #123")
 	e.EmitSync("order.updated", "Order #124")
 	e.EmitSync("order.cancelled", "Order #125")
-
-	// This will NOT match "order.*" (too many segments)
 	e.EmitSync("order.item.added", "Order #126")
 
 	fmt.Println()
 
-	// Multi-level wildcard (**)
-	// Matches zero or more segments
 	fmt.Println("--- Multi-level Wildcard (**) ---")
 
 	multiWildcardListener := func(evt emitter.Event) error {
@@ -52,18 +45,14 @@ func main() {
 		log.Fatalf("Failed to subscribe: %v", err)
 	}
 
-	// All of these will match "system.**"
 	e.EmitSync("system.cpu.high", "CPU usage 95%")
 	e.EmitSync("system.memory.low", "Memory < 100MB")
 	e.EmitSync("system.disk.full.warning", "Disk usage 98%")
 	e.EmitSync("system.network.latency.spike.detected", "Latency > 500ms")
-
-	// This will NOT match "system.**"
 	e.EmitSync("application.error", "App crashed")
 
 	fmt.Println()
 
-	// Combined patterns
 	fmt.Println("--- Combined Patterns ---")
 
 	combinedListener := func(evt emitter.Event) error {
@@ -71,7 +60,6 @@ func main() {
 		return nil
 	}
 
-	// Match any event that has "error" as the last segment
 	_, err = e.On("**.error", combinedListener)
 	if err != nil {
 		log.Fatalf("Failed to subscribe: %v", err)
@@ -83,7 +71,6 @@ func main() {
 
 	fmt.Println()
 
-	// Multiple wildcard listeners
 	fmt.Println("--- Multiple Wildcard Listeners ---")
 
 	allEventsListener := func(evt emitter.Event) error {
@@ -96,11 +83,9 @@ func main() {
 		log.Fatalf("Failed to subscribe: %v", err)
 	}
 
-	// This will trigger multiple listeners
 	fmt.Println("\nEmitting 'system.cpu.error' - will match multiple patterns:")
 	e.EmitSync("system.cpu.error", "CPU error detected")
 
-	// Clean up
 	err = e.Close()
 	if err != nil {
 		log.Printf("Error closing emitter: %v", err)

@@ -2,15 +2,14 @@ package emitter
 
 import "strings"
 
-// Wildcard tokens supported in topic patterns.
 const (
-	SingleWildcard = "*"  // Matches exactly one topic segment.
-	MultiWildcard  = "**" // Matches zero or more topic segments.
+	// SingleWildcard matches exactly one topic segment.
+	SingleWildcard = "*"
+	// MultiWildcard matches zero or more topic segments.
+	MultiWildcard = "**"
 )
 
-// matchTopicPattern reports whether the subject matches the pattern with wildcards.
-// Supports single wildcard (*) for one segment and multi-wildcard (**)
-// for zero or more segments. Segments are separated by dots.
+// matchTopicPattern reports whether subject matches pattern.
 func matchTopicPattern(pattern, subject string) bool {
 	if pattern == subject {
 		return true
@@ -73,8 +72,7 @@ func matchTopicPattern(pattern, subject string) bool {
 	return matchParts(0, 0)
 }
 
-// isValidTopicName reports whether the given topic name is valid.
-// Empty strings and strings containing regex-like characters are rejected.
+// isValidTopicName reports whether topicName is valid.
 func isValidTopicName(topicName string) bool {
 	return topicName != "" && !strings.ContainsAny(topicName, "?[")
 }

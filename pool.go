@@ -2,40 +2,39 @@ package emitter
 
 import "github.com/alitto/pond"
 
-// Pool defines the interface for goroutine pool implementations used by the Emitter
-// to manage concurrent event handler execution.
+// Pool schedules work for Emit.
 type Pool interface {
-	// Submit enqueues a task for execution in the pool.
+	// Submit schedules task for execution.
 	Submit(task func())
-	// Running returns the number of currently active workers.
+	// Running returns the number of active workers.
 	Running() int
-	// Release stops the pool and waits for all tasks to complete.
+	// Release stops the pool and waits for queued work.
 	Release()
 }
 
-// PondPool wraps a [pond.WorkerPool] to implement the [Pool] interface.
+// PondPool adapts [pond.WorkerPool] to [Pool].
 type PondPool struct {
 	pool *pond.WorkerPool
 }
 
-// NewPondPool creates a new PondPool with the given worker and capacity limits.
+// NewPondPool returns a [PondPool] with the given limits.
 func NewPondPool(maxWorkers, maxCapacity int, options ...pond.Option) *PondPool {
 	return &PondPool{
 		pool: pond.New(maxWorkers, maxCapacity, options...),
 	}
 }
 
-// Submit enqueues a task for execution in the pool.
+// Submit schedules task for execution.
 func (p *PondPool) Submit(task func()) {
 	p.pool.Submit(task)
 }
 
-// Running returns the number of currently active workers.
+// Running returns the number of active workers.
 func (p *PondPool) Running() int {
 	return p.pool.RunningWorkers()
 }
 
-// Release stops the pool and waits for all tasks to complete.
+// Release stops the pool and waits for queued work.
 func (p *PondPool) Release() {
 	p.pool.StopAndWait()
 }
