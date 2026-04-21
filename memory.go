@@ -67,9 +67,10 @@ func (m *MemoryEmitter) Emit(topicName string, payload any) <-chan error {
 	errChan := make(chan error, m.errChanBufferSize.Load())
 
 	if m.closed.Load() {
-		errChan <- ErrEmitterClosed
-		close(errChan)
-		return errChan
+		closedErrChan := make(chan error, 1)
+		closedErrChan <- ErrEmitterClosed
+		close(closedErrChan)
+		return closedErrChan
 	}
 
 	task := func() {
@@ -114,9 +115,7 @@ func (m *MemoryEmitter) handleEvents(topicName string, payload any, onError func
 
 		topic := value.(*Topic)
 		for _, err := range topic.Trigger(event) {
-			if errorHandler != nil {
-				err = (*errorHandler)(event, err)
-			}
+			err = (*errorHandler)(event, err)
 			if err != nil {
 				onError(err)
 			}
@@ -143,17 +142,19 @@ func (m *MemoryEmitter) EnsureTopic(topicName string) *Topic {
 // SetErrorHandler assigns a custom error handler for the Emitter.
 // A nil handler is ignored; the previous handler remains active.
 func (m *MemoryEmitter) SetErrorHandler(handler func(Event, error) error) {
-	if handler != nil {
-		m.errorHandler.Store(&handler)
+	if handler == nil {
+		return
 	}
+	m.errorHandler.Store(&handler)
 }
 
 // SetIDGenerator assigns a custom ID generator for new listeners.
 // A nil generator is ignored; the previous generator remains active.
 func (m *MemoryEmitter) SetIDGenerator(generator func() string) {
-	if generator != nil {
-		m.idGenerator.Store(&generator)
+	if generator == nil {
+		return
 	}
+	m.idGenerator.Store(&generator)
 }
 
 // SetPool sets a custom goroutine pool for managing concurrent event handling.
