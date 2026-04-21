@@ -2,6 +2,7 @@ package emitter
 
 import (
 	"fmt"
+	"math"
 	"sync"
 	"sync/atomic"
 )
@@ -11,7 +12,6 @@ type MemoryEmitter struct {
 	topics            sync.Map
 	errorHandler      atomic.Pointer[func(Event, error) error]
 	idGenerator       atomic.Pointer[func() string]
-	panicHandler      atomic.Pointer[func(any)]
 	pool              Pool
 	closed            atomic.Bool
 	errChanBufferSize atomic.Int32
@@ -23,10 +23,8 @@ func NewMemoryEmitter(opts ...EmitterOption) *MemoryEmitter {
 
 	errorHandler := DefaultErrorHandler
 	idGenerator := DefaultIDGenerator
-	panicHandler := DefaultPanicHandler
 	m.errorHandler.Store(&errorHandler)
 	m.idGenerator.Store(&idGenerator)
-	m.panicHandler.Store(&panicHandler)
 	m.errChanBufferSize.Store(10)
 
 	for _, opt := range opts {
@@ -104,17 +102,8 @@ func (m *MemoryEmitter) EmitSync(topicName string, payload any) []error {
 	return errs
 }
 
-// handleEvents processes an event and notifies all matching listeners,
-// with error handling and panic recovery.
+// handleEvents processes an event and notifies all matching listeners.
 func (m *MemoryEmitter) handleEvents(topicName string, payload any, onError func(error)) {
-	defer func() {
-		if r := recover(); r != nil {
-			if handler := m.panicHandler.Load(); handler != nil {
-				(*handler)(r)
-			}
-		}
-	}()
-
 	event := NewBaseEvent(topicName, payload)
 	errorHandler := m.errorHandler.Load()
 	m.topics.Range(func(key, value any) bool {
@@ -172,17 +161,14 @@ func (m *MemoryEmitter) SetPool(p Pool) {
 	m.pool = p
 }
 
-// SetPanicHandler sets a function that will be called when a panic occurs during event handling.
-// A nil handler is ignored; the previous handler remains active.
-func (m *MemoryEmitter) SetPanicHandler(handler PanicHandler) {
-	if handler != nil {
-		fn := func(v any) { handler(v) }
-		m.panicHandler.Store(&fn)
-	}
-}
-
 // SetErrChanBufferSize sets the size of the buffered channel for errors returned by [MemoryEmitter.Emit].
 func (m *MemoryEmitter) SetErrChanBufferSize(size int) {
+	if size < 0 {
+		size = 0
+	}
+	if size > math.MaxInt32 {
+		size = math.MaxInt32
+	}
 	m.errChanBufferSize.Store(int32(size))
 }
 

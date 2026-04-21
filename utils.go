@@ -2,6 +2,7 @@ package emitter
 
 import "strings"
 
+// Wildcard tokens supported in topic patterns.
 const (
 	SingleWildcard = "*"  // Matches exactly one topic segment.
 	MultiWildcard  = "**" // Matches zero or more topic segments.

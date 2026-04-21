@@ -1,3 +1,4 @@
+// Package main demonstrates an order-processing workflow with emitter.
 package main
 
 import (

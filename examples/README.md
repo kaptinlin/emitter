@@ -81,14 +81,14 @@ Customize listener identification:
 
 ---
 
-### 6. Custom Panic Handling
+### 6. Listener Panic Errors
 **Directory**: `custom_panic_handing/`
 
-Gracefully handle panics:
-- Custom panic recovery handlers
-- Logging panic information
+Handle listener panics as returned errors:
+- Recovered panics surfaced through `Emit`
+- Logging panic-derived errors
 - Preventing entire application crashes
-- Best practices for panic handling in listeners
+- Best practices for panic-aware listeners
 
 **Run**: `cd custom_panic_handing && go run main.go`
 
@@ -135,7 +135,7 @@ Optimize concurrency:
 | Event abortion | `listener_management`, `order_processing` |
 | Custom error handling | `custom_error_handling` |
 | Custom ID generation | `custom_id_generator` |
-| Panic recovery | `custom_panic_handing` |
+| Listener panic errors | `custom_panic_handing` |
 | Goroutine pooling | `pool` |
 
 ## Learning Path
@@ -150,7 +150,7 @@ Optimize concurrency:
 
 **Advanced features**:
 - `custom_id_generator` - Customize listener tracking
-- `custom_panic_handing` - Handle edge cases gracefully
+- `custom_panic_handing` - Handle listener panic errors gracefully
 
 ## Common Patterns
 

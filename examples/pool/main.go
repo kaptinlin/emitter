@@ -1,3 +1,4 @@
+// Package main demonstrates emitter goroutine-pool integration.
 package main
 
 import (

@@ -1,3 +1,4 @@
+// Package main demonstrates custom emitter error handling.
 package main
 
 import (

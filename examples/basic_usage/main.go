@@ -1,3 +1,4 @@
+// Package main demonstrates basic emitter usage.
 package main
 
 import (

@@ -41,10 +41,6 @@ type Emitter interface {
 	// within the Emitter.
 	SetPool(Pool)
 
-	// SetPanicHandler sets a function that will be called in case of a panic
-	// during event handling.
-	SetPanicHandler(PanicHandler)
-
 	// SetErrChanBufferSize sets the size of the buffered channel for errors
 	// returned by asynchronous emits.
 	SetErrChanBufferSize(int)

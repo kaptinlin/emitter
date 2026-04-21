@@ -1,3 +1,4 @@
+// Package main demonstrates emitter wildcard topic matching.
 package main
 
 import (

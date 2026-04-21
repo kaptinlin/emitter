@@ -13,7 +13,7 @@ Emitter is a high-performance, thread-safe Go library for event management that 
 - 📋 **Priority-Based Processing**: Fine-grained control over listener execution order
 - ⚡ **Concurrent & Parallel**: Goroutine pools and lock-free operations
 - 🎯 **Smart Pattern Matching**: Wildcard subscriptions with `*` and `**` support
-- 🛠️ **Highly Customizable**: Custom error handlers, ID generators, panic recovery
+- 🛠️ **Highly Customizable**: Custom error handlers, ID generators, and concurrency control
 - 🔒 **Thread-Safe**: Designed for high-concurrency environments
 - 🧪 **Battle-Tested**: Comprehensive test suite including fuzz testing
 - 📦 **Go 1.26 Ready**: Uses latest Go features for optimal performance
@@ -65,7 +65,6 @@ e := emitter.NewMemoryEmitter(
 | `WithPool(pool emitter.Pool)`                  | Assign a goroutine pool for concurrent event handling.       |
 | `WithErrorHandler(handler func(emitter.Event, error) error)` | Set a custom error handler for the emitter that receives an event and an error. |
 | `WithIDGenerator(generator func() string)`     | Define a function for generating unique listener IDs.        |
-| `WithPanicHandler(handler func(any))`          | Implement a panic recovery strategy.                         |
 | `WithErrChanBufferSize(size int)`              | Set the buffer size for error channels in async operations.  |
 
 ## 🎯 Wildcard Event Subscription
@@ -123,7 +122,7 @@ Abort event handling early based on custom logic.
 - [Custom Error Handling](#custom-error-handling-with-witherrorhandler)
 - [Listener Prioritization](#prioritizing-listeners-with-withpriority)
 - [ID Generation](#generating-unique-ids-with-withidgenerator)
-- [Panic Recovery](#handling-panics-gracefully-with-withpanichandler)
+- [Listener Panic Errors](#listener-panic-errors)
 
 ### ⚡ Managing Concurrency with `WithPool`
 
@@ -243,33 +242,35 @@ func main() {
 
 Listeners are now identified by a unique UUID, providing better traceability.
 
-### 🛡️ Handling Panics Gracefully with `WithPanicHandler`
+### 🛡️ Listener Panic Errors
 
-Safeguard your application from unexpected panics during event handling:
+Listener panics are recovered at the emitter boundary and returned as errors:
 
 ```go
 package main
 
 import (
+	"errors"
 	"log"
+
 	"github.com/kaptinlin/emitter"
 )
 
 func main() {
-	// Define a panic handler that logs the occurrence
-	logPanicHandler := func(p any) {
-		log.Printf("Panic recovered: %v", p)
-		// Insert additional logic for panic recovery here
+	e := emitter.NewMemoryEmitter()
+	_, _ = e.On("user.created", func(evt emitter.Event) error {
+		panic("boom")
+	})
+
+	for err := range e.Emit("user.created", "Jane Doe") {
+		if errors.Is(err, emitter.ErrListenerPanic) {
+			log.Printf("listener panic surfaced as error: %v", err)
+		}
 	}
-
-	// Equip the emitter with the panic handler
-	e := emitter.NewMemoryEmitter(emitter.WithPanicHandler(logPanicHandler))
-
-	// Your emitter is now more resilient to panics
 }
 ```
 
-This handler ensures that panics are logged and managed without disrupting your service.
+This keeps the application running while still surfacing the failure to callers.
 
 ## 🔧 Development Commands
 

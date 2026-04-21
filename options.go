@@ -1,9 +1,6 @@
 package emitter
 
-import (
-	"crypto/rand"
-	"fmt"
-)
+import "crypto/rand"
 
 // EmitterOption defines a function type for MemoryEmitter configuration options.
 type EmitterOption func(*MemoryEmitter)
@@ -15,14 +12,7 @@ var DefaultErrorHandler = func(event Event, err error) error {
 
 // DefaultIDGenerator generates a unique identifier using crypto/rand.Text (Go 1.24+),
 // returning a base32-encoded string with at least 128 bits of randomness.
-var DefaultIDGenerator = func() string {
-	return rand.Text()
-}
-
-// DefaultPanicHandler prints the panic value to stdout.
-var DefaultPanicHandler = func(p any) {
-	fmt.Printf("Panic occurred: %v\n", p)
-}
+var DefaultIDGenerator = rand.Text
 
 // WithErrorHandler sets a custom error handler for a MemoryEmitter.
 func WithErrorHandler(errHandler func(Event, error) error) EmitterOption {
@@ -42,16 +32,6 @@ func WithIDGenerator(idGen func() string) EmitterOption {
 func WithPool(pool Pool) EmitterOption {
 	return func(m *MemoryEmitter) {
 		m.SetPool(pool)
-	}
-}
-
-// PanicHandler is a function type that handles panics during event processing.
-type PanicHandler func(any)
-
-// WithPanicHandler sets a custom panic handler for a MemoryEmitter.
-func WithPanicHandler(panicHandler PanicHandler) EmitterOption {
-	return func(m *MemoryEmitter) {
-		m.SetPanicHandler(panicHandler)
 	}
 }
 

@@ -4,6 +4,7 @@ package emitter
 // Higher values execute first.
 type Priority int
 
+// Priority levels in ascending order from lowest to highest.
 const (
 	Lowest  Priority = 0
 	Low     Priority = 25

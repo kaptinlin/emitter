@@ -1,3 +1,4 @@
+// Package main demonstrates emitter listener management patterns.
 package main
 
 import (

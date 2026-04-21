@@ -82,7 +82,15 @@ func (t *Topic) Trigger(event Event) []error {
 		if !ok {
 			continue
 		}
-		if err := item.listener(event); err != nil {
+		err := func() (err error) {
+			defer func() {
+				if recovered := recover(); recovered != nil {
+					err = newPanicError(recovered)
+				}
+			}()
+			return item.listener(event)
+		}()
+		if err != nil {
 			errs = append(errs, err)
 		}
 		if event.IsAborted() {

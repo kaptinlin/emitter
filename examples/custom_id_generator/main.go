@@ -1,9 +1,11 @@
+// Package main demonstrates custom listener ID generation.
 package main
 
 import (
 	"fmt"
 
 	"github.com/google/uuid"
+
 	"github.com/kaptinlin/emitter"
 )
 

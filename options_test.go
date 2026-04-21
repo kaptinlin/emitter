@@ -91,82 +91,44 @@ func TestWithErrorHandlerAsync(t *testing.T) {
 	assert.True(t, handlerCalled, "Custom error handler was not called on listener error")
 }
 
-func TestWithPanicHandlerSync(t *testing.T) {
-	// Flag to indicate panic handler invocation
-	var panicHandlerInvoked bool
+func TestEmitSyncReturnsRecoveredPanicError(t *testing.T) {
+	emitter := NewMemoryEmitter()
 
-	// Define a custom panic handler
-	customPanicHandler := func(p any) {
-		if p == "test panic" {
-			panicHandlerInvoked = true
-		}
-	}
-
-	// Create a new MemoryEmitter with the custom panic handler.
-	emitter := NewMemoryEmitter(WithPanicHandler(customPanicHandler))
-
-	// Define a listener that panics
-	listener := func(e Event) error {
-		panic("test panic")
-	}
-
-	// Subscribe the listener to a topic.
-	_, err := emitter.On("testTopic", listener)
+	_, err := emitter.On("testTopic", func(Event) error {
+		panic(errTestCustomError)
+	})
 	require.NoError(t, err, "On() failed with error")
 
-	// Recover from panic to prevent test failure
-	defer func() {
-		if r := recover(); r != nil {
-			// This is expected
-			t.Logf("Recovered from panic: %v", r)
-		}
-	}()
+	errs := emitter.EmitSync("testTopic", "testPayload")
+	require.Len(t, errs, 1)
+	assert.ErrorIs(t, errs[0], ErrListenerPanic)
+	assert.ErrorIs(t, errs[0], errTestCustomError)
 
-	// Emit the event synchronously to trigger the panic.
-	emitter.EmitSync("testTopic", "testPayload")
-
-	// Verify that the custom panic handler was invoked
-	assert.True(t, panicHandlerInvoked, "Custom panic handler was not called on listener panic")
+	var panicErr *PanicError
+	require.ErrorAs(t, errs[0], &panicErr)
+	assert.Equal(t, errTestCustomError, panicErr.Value)
 }
 
-func TestWithPanicHandlerAsync(t *testing.T) {
-	// Flag to indicate panic handler invocation
-	var panicHandlerInvoked bool
-	var panicHandlerMutex sync.Mutex // To safely update panicHandlerInvoked from different goroutines
+func TestEmitReturnsRecoveredPanicError(t *testing.T) {
+	emitter := NewMemoryEmitter()
 
-	// Define a custom panic handler
-	customPanicHandler := func(p any) {
-		panicHandlerMutex.Lock()
-		defer panicHandlerMutex.Unlock()
-		if p == "test panic" {
-			panicHandlerInvoked = true
-		}
-	}
-
-	// Create a new MemoryEmitter with the custom panic handler.
-	emitter := NewMemoryEmitter(WithPanicHandler(customPanicHandler))
-
-	// Define a listener that panics
-	listener := func(e Event) error {
+	_, err := emitter.On("testTopic", func(Event) error {
 		panic("test panic")
-	}
-
-	// Subscribe the listener to a topic.
-	_, err := emitter.On("testTopic", listener)
+	})
 	require.NoError(t, err, "On() failed with error")
 
-	// Emit the event asynchronously to trigger the panic.
 	errChan := emitter.Emit("testTopic", "testPayload")
-
-	// Wait for all events to be processed (which includes recovering from panic).
-	for range errChan {
-		// Normally, you'd check for errors here, but in this case, we expect a panic, not an error
+	var errs []error
+	for err := range errChan {
+		errs = append(errs, err)
 	}
 
-	// Verify that the custom panic handler was invoked
-	panicHandlerMutex.Lock()
-	defer panicHandlerMutex.Unlock()
-	assert.True(t, panicHandlerInvoked, "Custom panic handler was not called on listener panic")
+	require.Len(t, errs, 1)
+	assert.ErrorIs(t, errs[0], ErrListenerPanic)
+
+	var panicErr *PanicError
+	require.ErrorAs(t, errs[0], &panicErr)
+	assert.Equal(t, "test panic", panicErr.Value)
 }
 
 func TestWithIDGenerator(t *testing.T) {
