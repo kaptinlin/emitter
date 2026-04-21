@@ -4,236 +4,133 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**emitter** is a high-performance, thread-safe event emitter library for Go 1.26.2. Built with lock-free atomic operations and optimized data structures for high-concurrency scenarios with minimal memory allocations.
+**emitter** is a thread-safe in-memory event emitter for Go 1.26.2.
+It supports exact topics, wildcard subscriptions, listener priorities, optional goroutine pooling, and panic recovery that surfaces as returned errors.
 
 - **Module**: `github.com/kaptinlin/emitter`
-- **Go Version**: 1.26.2
+- **Go Version**: `1.26.2`
 - **License**: MIT
+- **Usage Docs**: [README.md](README.md)
+- **Examples**: [examples/README.md](examples/README.md)
 
 ## Commands
 
 ```bash
-# Run all checks (lint + test)
-make all
-
-# Run tests with race detection
-task test
-
-# Run fuzz tests (10 seconds)
-task test-fuzz
-
-# Check for shadowed variables
-make vet-shadow
-
-# Lint code (golangci-lint + mod tidy check)
-task lint
-
-# Clean build artifacts
-task clean
+task test        # Run `go test -race ./...`
+task lint        # Run golangci-lint and the go mod tidy check
+task test-fuzz   # Run fuzz coverage for topic matching
+task clean       # Remove local build artifacts and test cache
+task verify      # Run deps, fmt, vet, lint, test, and vuln checks
 ```
-
-The project uses golangci-lint v2 with version pinned in `.golangci.version`. All tests run with race detection enabled.
 
 ## Architecture
 
-### Core Components
-
 ```text
 emitter/
-├── emitter.go          # Emitter interface definition
-├── memory.go           # MemoryEmitter: thread-safe in-memory implementation
-├── event.go            # Event interface and BaseEvent implementation
-├── topic.go            # Topic: priority-sorted listener management
-├── listener.go         # Listener function type
-├── options.go          # Functional options for configuration
-├── priority.go         # Priority levels (Lowest to Highest)
-├── pool.go             # Goroutine pool integration (optional)
-├── utils.go            # Wildcard pattern matching
-└── errors.go           # Error definitions
+├── emitter.go         # Public Emitter interface
+├── memory.go          # MemoryEmitter implementation and topic routing
+├── event.go           # Event interface and BaseEvent
+├── topic.go           # Listener registry and priority-ordered dispatch
+├── listener.go        # Listener type and listener options
+├── options.go         # MemoryEmitter configuration options
+├── priority.go        # Priority constants and validation
+├── pool.go            # Optional pond-backed Pool adapter
+├── errors.go          # Sentinel errors and PanicError
+├── utils.go           # Topic validation and wildcard matching
+├── examples/          # Runnable usage examples
+└── benchmark_test.go  # Performance regression coverage
 ```
 
-### Key Types and Interfaces
+### Core Responsibilities
 
-**Emitter Interface** (`emitter.go`)
-
-- `On(topic, listener, opts...)` - Register listener with optional priority
-- `Off(topic, listenerID)` - Deregister listener by ID
-- `Emit(topic, payload)` - Async event emission (returns error channel)
-- `EmitSync(topic, payload)` - Sync event emission (blocks until complete)
-- `GetTopic(name)` / `EnsureTopic(name)` - Topic management
-- `Close()` - Graceful shutdown
-
-**MemoryEmitter** (`memory.go`)
-
-- Uses `sync.Map` for lock-free topic storage
-- `atomic.Pointer` for handlers (error, panic, ID generator)
-- `atomic.Bool` for closed state
-- `atomic.Int32` for error channel buffer size
-
-**Topic** (`topic.go`)
-
-- Maintains listeners in priority-sorted order using `slices.BinarySearchFunc`
-- `sync.RWMutex` for listener map protection
-- `Trigger(event)` executes listeners in priority order, stops on abort
-
-**Event Interface** (`event.go`)
-
-- `Topic()` - Event topic name
-- `Payload()` - Event data
-- `SetAborted(bool)` / `IsAborted()` - Control propagation
-
-**Listener** (`listener.go`)
-
-- Type: `func(Event) error`
-
-### Wildcard Pattern Matching
-
-Supports two wildcard types (`utils.go`):
-
-- `*` - Matches exactly one segment (e.g., `user.*` matches `user.created`)
-- `**` - Matches zero or more segments (e.g., `order.**` matches `order.created.success`)
-
-Pattern matching uses a recursive algorithm with a fast-path optimization for exact matches.
-
-### Priority System
-
-Five priority levels (`priority.go`):
-
-- `Highest` (100)
-- `High` (75)
-- `Normal` (50) - default
-- `Low` (25)
-- `Lowest` (0)
-
-Listeners execute in descending priority order. Use `WithPriority(level)` when registering.
-
-### Configuration Options
-
-Functional options pattern (`options.go`):
-
-- `WithErrorHandler(func(Event, error) error)` - Custom error handling
-- `WithIDGenerator(func() string)` - Custom listener ID generation (default: `rand.Text()`)
-- `WithPanicHandler(func(any))` - Panic recovery
-- `WithPool(Pool)` - Goroutine pool for concurrent execution
-- `WithErrChanBufferSize(int)` - Error channel buffer size (default: 10)
+- `MemoryEmitter` owns topic lookup, emission mode, close state, and emitter-wide configuration.
+- `Topic` owns listener storage, ordering, and per-topic dispatch.
+- `BaseEvent` owns mutable payload and aborted state for a single emission.
+- `Pool` is optional; `EmitSync` stays local while `Emit` can delegate work to pooled execution.
 
 ## Design Philosophy
 
-### Performance-First Design
+- **KISS** — Keep the API small: register listeners, emit events, remove listeners, close the emitter.
+- **SRP** — Routing lives in `MemoryEmitter`, ordering lives in `Topic`, and event state lives in `BaseEvent`.
+- **Simplicity as art** — Topic matching is limited to exact names, `*`, and `**`; avoid richer subscription DSLs.
+- **Errors as teachers** — Invalid topic names, missing listeners, closed emitters, and recovered listener panics all surface as typed errors.
+- **Never:** accidental complexity, feature gravity, abstraction theater, configurability cope.
 
-- **Lock-free hot paths**: `atomic.Pointer` for handler access, `sync.Map` for topic lookup
-- **Zero-copy operations**: Minimal allocations in event emission and listener execution
-- **Efficient data structures**: Binary search for listener insertion (O(log n)), sorted slice traversal
-- **Modern Go features**: Uses Go 1.26 `slices` package and `synctest` for deterministic concurrency testing
+## API Design Principles
 
-### Thread Safety Guarantees
-
-- All public methods are thread-safe
-- MemoryEmitter uses atomic operations for state management
-- Topics use `sync.RWMutex` with reader preference for high-read scenarios
-- Events use `sync.RWMutex` for payload/abort state protection
-
-### Simplicity and Composability
-
-- Clean interface-based design
-- Functional options for extensibility
-- Optional goroutine pool integration (bring your own pool)
-- No external dependencies for core functionality
+- **Progressive Disclosure** — `NewMemoryEmitter`, `On`, and `EmitSync` cover the common path; setters, listener options, and `Pool` support advanced control.
 
 ## Coding Rules
 
-### Go 1.26 Modern Features
+### Must Follow
 
-- Use `slices.BinarySearchFunc`, `slices.Insert`, `slices.Delete` for slice operations
-- Use `any` instead of `interface{}`
-- Use `atomic.Pointer`, `atomic.Bool`, `atomic.Int32` for lock-free operations
-- Use `rand.Text()` for ID generation (Go 1.24+)
-- Use `for range N` syntax where appropriate
+- Use Go 1.26.2 features when they make the code smaller or clearer.
+- Follow Google Go Best Practices and Google Go Style Decisions.
+- Return errors instead of panicking in production code.
+- Keep public APIs thread-safe.
+- Use the sentinel errors in `errors.go` for caller-visible failure modes.
+- Keep wildcard semantics aligned with `utils.go`: `*` matches one segment, `**` matches zero or more segments.
+- Use `WithPriority` or the emitter setters instead of reaching into internal state.
+- Keep examples and README snippets aligned with the public API.
 
-### Error Handling
+### Forbidden
 
-- Return sentinel errors defined in `errors.go`:
-  - `ErrNilListener` - nil listener passed to `On()`
-  - `ErrInvalidTopicName` - empty or invalid topic name
-  - `ErrTopicNotFound` - topic does not exist
-  - `ErrListenerNotFound` - listener ID not found
-  - `ErrEmitterClosed` - operation on a closed emitter
-  - `ErrEmitterAlreadyClosed` - `Close()` called twice
-- Use `fmt.Errorf` with `%w` for error wrapping when adding context
+- No `panic` in production code; recovered listener panics must surface as errors matching `ErrListenerPanic`.
+- No working around dependency bugs — if a dependency is wrong, report it in `reports/` instead of reimplementing it inline.
+- No feature creep beyond exact topics, wildcards, priorities, pooling, and error handling already supported here.
+- No breaking the `AGENTS.md -> CLAUDE.md` symlink.
 
-### Concurrency Patterns
+## Dependency Issue Reporting
 
-- Use `sync.Map` for concurrent map access without explicit locking
-- Use `atomic.Pointer` for lock-free handler updates
-- Use `sync.RWMutex` when read-heavy workloads benefit from reader concurrency
-- Always use `defer` for mutex unlocks
-- Recover from panics in event handlers using `defer recover()`
+When you hit a bug or limitation in a dependency library:
 
-### Performance Guidelines
+1. Do not work around it by reimplementing the dependency's behavior.
+2. Create `reports/<dependency-name>.md`.
+3. Record the dependency version, trigger scenario, expected behavior, actual behavior, and any non-code workaround.
+4. Continue with work that does not depend on the broken behavior.
 
-- Avoid allocations in hot paths (event emission, listener execution)
-- Pre-allocate slices when size is known
-- Use `strings.Builder` for string concatenation
-- Prefer atomic operations over mutexes for simple state
-- Use binary search for sorted slice operations
+## Error Handling
+
+- `ErrNilListener`, `ErrInvalidTopicName`, `ErrTopicNotFound`, `ErrListenerNotFound`, `ErrEmitterClosed`, and `ErrEmitterAlreadyClosed` are the primary sentinel errors.
+- Listener panics are recovered and wrapped in `PanicError`; callers should match them with `errors.Is(err, ErrListenerPanic)`.
+- `Emit` returns a channel of handled listener errors; `EmitSync` returns a slice of handled listener errors.
 
 ## Testing
 
-### Test Strategy
-
-- **Unit tests**: Component-level testing with `testify/assert` and `testify/require`
-- **Parallel tests**: Use `t.Parallel()` for independent tests
-- **Concurrency tests**: Use `testing/synctest` (Go 1.26) for deterministic time-based testing
-- **Fuzz tests**: Pattern matching edge cases (`utils_fuzz_test.go`)
-- **Race detection**: All tests run with the `-race` flag via `task test`
-- **Benchmarks**: Performance regression detection (`benchmark_test.go`)
-
-### Test Conventions
-
-- Use table-driven tests with subtests for multiple scenarios
-- Use `sync.WaitGroup` and channels for synchronization, never `time.Sleep` in production tests
-- Use `synctest.Test()` for tests involving time delays or concurrent operations
-- Name test errors with the `errTest` prefix (e.g., `errTestListenerError`)
-- Use `t.Cleanup()` for resource cleanup
-
-### Running Tests
-
-```bash
-task test           # All tests with race detection
-task test-fuzz      # Fuzz tests (10s)
-make vet-shadow     # Check variable shadowing
-```
+- Run `task test` before finishing work in this package.
+- Use `t.Parallel()` for independent tests.
+- Use `testing/synctest` for time-based concurrent behavior instead of long real sleeps.
+- Prefer table-driven tests for topic validation, wildcard matching, and priority behavior.
+- Validate documentation examples with runnable example tests rather than tests that parse markdown files.
 
 ## Dependencies
 
-### Production
+### Runtime
 
-- `github.com/alitto/pond` - Optional goroutine pool (used via `Pool` interface)
+- `github.com/alitto/pond` — optional goroutine pool adapter used by `PondPool`
 
 ### Development
 
-- `github.com/stretchr/testify` - Test assertions
-- `github.com/google/uuid` - Used in examples only
+- `github.com/stretchr/testify` — assertions in unit tests
+- `github.com/google/uuid` — example-only custom ID generation
 
 ## SPECS Index
 
-This repository does not currently maintain a top-level `SPECS/` directory. No scattered design/spec/architecture markdown files were found during the 2026-04-21 maintenance sweep.
+This repository does not maintain a top-level `SPECS/` directory.
 
 ## Agent Skills
 
-This package indexes agent skills from its own `.agents/skills` directory (`emitter/.agents/skills/`):
+This package vendors shared Go skills in `.agents/skills/`. Start with these:
 
 | Skill | When to Use |
 |-------|-------------|
-| [agent-md-creating](.agents/skills/agent-md-creating/) | Create or update CLAUDE.md and AGENTS.md instructions for this Go package. |
-| [code-simplifying](.agents/skills/code-simplifying/) | Refine recently changed Go code for clarity and consistency without behavior changes. |
-| [committing](.agents/skills/committing/) | Prepare conventional commit messages for this Go package. |
-| [dependency-selecting](.agents/skills/dependency-selecting/) | Evaluate and choose Go dependencies with alternatives and risk tradeoffs. |
-| [go-best-practices](.agents/skills/go-best-practices/) | Apply Google Go style and architecture best practices to code changes. |
-| [linting](.agents/skills/linting/) | Configure or run golangci-lint and fix lint issues in this package. |
-| [modernizing](.agents/skills/modernizing/) | Adopt newer Go language and toolchain features safely. |
-| [ralphy-initializing](.agents/skills/ralphy-initializing/) | Initialize or repair the .ralphy workflow configuration. |
-| [ralphy-todo-creating](.agents/skills/ralphy-todo-creating/) | Generate or refine TODO tracking via the Ralphy workflow. |
-| [readme-creating](.agents/skills/readme-creating/) | Create or rewrite README.md for this package. |
-| [releasing](.agents/skills/releasing/) | Prepare release and semantic version workflows for this package. |
-| [testing](.agents/skills/testing/) | Design or update tests (table-driven, fuzz, benchmark, and edge-case coverage). |
+| [agent-md-writing](.agents/skills/agent-md-writing/) | Refresh `CLAUDE.md` and the `AGENTS.md` symlink. |
+| [readme-writing](.agents/skills/readme-writing/) | Refresh human-facing usage documentation. |
+| [library-docs-maintaining](.agents/skills/library-docs-maintaining/) | Refresh `CLAUDE.md`, `AGENTS.md`, and `README.md` together. |
+| [golangci-linting](.agents/skills/golangci-linting/) | Update lint configuration or fix lint failures. |
+| [library-test-covering](.agents/skills/library-test-covering/) | Add or improve runtime-focused test coverage. |
+| [library-code-modernizing](.agents/skills/library-code-modernizing/) | Adopt newer Go language and toolchain features safely. |
+| [go-best-practices](.agents/skills/go-best-practices/) | Align code with Go style and API design conventions. |
+| [committing](.agents/skills/committing/) | Prepare Conventional Commit messages for this package. |
+| [library-specs-maintaining](.agents/skills/library-specs-maintaining/) | Refresh or align top-level `SPECS/` documents when the package adds them. |
+| [releasing](.agents/skills/releasing/) | Prepare versioning and release workflow changes. |

@@ -62,7 +62,7 @@ tasks:
     desc: Run fuzz tests
     cmds:
       - echo "Running fuzz tests..."
-      - go test -fuzz=FuzzMatchTopicPattern -fuzztime=10s ./...
+      - go test -fuzz=FuzzMatchTopicPattern -fuzztime=10s .
 
   vet-shadow:
     desc: Check for shadowed variables
