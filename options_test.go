@@ -242,6 +242,13 @@ func TestSetIDGeneratorNilKeepsExistingGenerator(t *testing.T) {
 	assert.Equal(t, "custom-id", returnedID)
 }
 
+func TestPanicErrorFormatsRecoveredValue(t *testing.T) {
+	t.Parallel()
+
+	err := &PanicError{Value: "boom"}
+	assert.Equal(t, "emitter: listener panicked: boom", err.Error())
+}
+
 func TestDefaultHandlers(t *testing.T) {
 	t.Parallel()
 
