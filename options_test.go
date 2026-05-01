@@ -2,6 +2,7 @@ package emitter
 
 import (
 	"errors"
+	"math"
 	"sync"
 	"testing"
 
@@ -118,7 +119,7 @@ func TestEmitReturnsRecoveredPanicError(t *testing.T) {
 	require.NoError(t, err, "On() failed with error")
 
 	errChan := emitter.Emit("testTopic", "testPayload")
-	var errs []error
+	errs := make([]error, 0, 1)
 	for err := range errChan {
 		errs = append(errs, err)
 	}
@@ -170,7 +171,7 @@ func TestWithErrChanBufferSize(t *testing.T) {
 	}
 
 	errChan := emitter.Emit("testTopic", "testPayload")
-	var errs []error
+	errs := make([]error, 0, 2)
 	for err := range errChan {
 		errs = append(errs, err)
 	}
@@ -196,13 +197,22 @@ func TestSetErrChanBufferSizeClampsNegativeValues(t *testing.T) {
 	errChan := emitter.Emit("testTopic", "testPayload")
 	assert.Zero(t, cap(errChan))
 
-	var errs []error
+	errs := make([]error, 0, 1)
 	for err := range errChan {
 		errs = append(errs, err)
 	}
 	if assert.Len(t, errs, 1) {
 		assert.ErrorIs(t, errs[0], listenerErr)
 	}
+}
+
+func TestSetErrChanBufferSizeClampsLargeValues(t *testing.T) {
+	t.Parallel()
+
+	emitter := NewMemoryEmitter()
+	emitter.SetErrChanBufferSize(math.MaxInt)
+
+	assert.Equal(t, int64(math.MaxInt32), emitter.errChanBufferSize.Load())
 }
 
 func TestSetErrorHandlerNilKeepsExistingHandler(t *testing.T) {
@@ -221,7 +231,7 @@ func TestSetErrorHandlerNilKeepsExistingHandler(t *testing.T) {
 	require.NoError(t, err)
 
 	errChan := emitter.Emit("testTopic", "testPayload")
-	var errs []error
+	errs := make([]error, 0, 1)
 	for err := range errChan {
 		errs = append(errs, err)
 	}

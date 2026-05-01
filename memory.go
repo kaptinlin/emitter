@@ -14,7 +14,7 @@ type MemoryEmitter struct {
 	idGenerator       atomic.Pointer[func() string]
 	pool              Pool
 	closed            atomic.Bool
-	errChanBufferSize atomic.Int32
+	errChanBufferSize atomic.Int64
 }
 
 // NewMemoryEmitter returns a [MemoryEmitter] configured with opts.
@@ -62,8 +62,6 @@ func (m *MemoryEmitter) Off(topicName string, listenerID string) error {
 
 // Emit emits payload to matching listeners and returns their errors.
 func (m *MemoryEmitter) Emit(topicName string, payload any) <-chan error {
-	errChan := make(chan error, m.errChanBufferSize.Load())
-
 	if m.closed.Load() {
 		closedErrChan := make(chan error, 1)
 		closedErrChan <- ErrEmitterClosed
@@ -71,6 +69,7 @@ func (m *MemoryEmitter) Emit(topicName string, payload any) <-chan error {
 		return closedErrChan
 	}
 
+	errChan := make(chan error, m.errChanBufferSize.Load())
 	task := func() {
 		defer close(errChan)
 		m.handleEvents(topicName, payload, func(err error) {
@@ -131,6 +130,10 @@ func (m *MemoryEmitter) GetTopic(topicName string) (*Topic, error) {
 
 // EnsureTopic returns the topic registered as topicName, creating it if needed.
 func (m *MemoryEmitter) EnsureTopic(topicName string) *Topic {
+	if topic, ok := m.topics.Load(topicName); ok {
+		return topic.(*Topic)
+	}
+
 	topic, _ := m.topics.LoadOrStore(topicName, NewTopic())
 	return topic.(*Topic)
 }
@@ -166,7 +169,7 @@ func (m *MemoryEmitter) SetErrChanBufferSize(size int) {
 	if size > math.MaxInt32 {
 		size = math.MaxInt32
 	}
-	m.errChanBufferSize.Store(int32(size))
+	m.errChanBufferSize.Store(int64(size))
 }
 
 // Close releases the emitter's resources.

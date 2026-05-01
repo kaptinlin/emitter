@@ -74,7 +74,11 @@ func (t *Topic) Trigger(event Event) []error {
 		err := func() (err error) {
 			defer func() {
 				if recovered := recover(); recovered != nil {
-					err = newPanicError(recovered)
+					panicErr := &PanicError{Value: recovered}
+					if cause, ok := recovered.(error); ok {
+						panicErr.Cause = cause
+					}
+					err = panicErr
 				}
 			}()
 			return item.listener(event)

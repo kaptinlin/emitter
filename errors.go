@@ -46,11 +46,3 @@ func (e *PanicError) Unwrap() error {
 	}
 	return ErrListenerPanic
 }
-
-func newPanicError(recovered any) *PanicError {
-	panicErr := &PanicError{Value: recovered}
-	if err, ok := recovered.(error); ok {
-		panicErr.Cause = err
-	}
-	return panicErr
-}
