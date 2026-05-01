@@ -163,12 +163,7 @@ func (m *MemoryEmitter) SetPool(p Pool) {
 
 // SetErrChanBufferSize sets the buffer size used by Emit error channels.
 func (m *MemoryEmitter) SetErrChanBufferSize(size int) {
-	if size < 0 {
-		size = 0
-	}
-	if size > math.MaxInt32 {
-		size = math.MaxInt32
-	}
+	size = min(max(size, 0), math.MaxInt32)
 	m.errChanBufferSize.Store(int64(size))
 }
 
