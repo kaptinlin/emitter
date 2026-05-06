@@ -15,11 +15,6 @@ func matchTopicPattern(pattern, subject string) bool {
 		return true
 	}
 
-	// No dots: only wildcards can match a different subject
-	if strings.IndexByte(pattern, '.') == -1 && strings.IndexByte(subject, '.') == -1 {
-		return pattern == SingleWildcard || pattern == MultiWildcard
-	}
-
 	patternParts := strings.Split(pattern, ".")
 	subjectParts := strings.Split(subject, ".")
 

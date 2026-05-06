@@ -14,6 +14,9 @@ func TestMatchTopicPattern(t *testing.T) {
 	}{
 		// Exact matches
 		{"event.some.thing.run", "event.some.thing.run", true},
+		// Exact non-matches
+		{"event", "other", false},
+		{"event", "", false},
 		// Single node wildcard matches
 		{"event.some.*.*", "event.some.thing.run", true},
 		{"event.some.*.*", "event.some.thing.do", true},
