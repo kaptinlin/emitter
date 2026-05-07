@@ -1,22 +1,15 @@
 package emitter
 
-// Priority controls listener execution order.
+// Priority controls listener execution order within a topic.
+// Listeners with a higher numerical priority run first; ties run in registration order.
+// Any int value is valid.
 type Priority int
 
+// Common priority sentinels. Callers may also use any other int value.
 const (
-	// Lowest is the lowest listener priority.
-	Lowest Priority = 0
-	// Low runs after Normal and above Lowest.
-	Low Priority = 25
-	// Normal is the default listener priority.
-	Normal Priority = 50
-	// High runs before Normal and below Highest.
-	High Priority = 75
-	// Highest is the highest listener priority.
+	Lowest  Priority = -100
+	Low     Priority = -50
+	Normal  Priority = 0
+	High    Priority = 50
 	Highest Priority = 100
 )
-
-// IsValid reports whether the priority value is within the valid range.
-func (p Priority) IsValid() bool {
-	return p >= Lowest && p <= Highest
-}

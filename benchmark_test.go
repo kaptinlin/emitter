@@ -1,135 +1,92 @@
 package emitter
 
 import (
-	"fmt"
+	"context"
+	"strconv"
 	"testing"
 )
 
-// BenchmarkEmitSync benchmarks synchronous event emission with a single listener.
-func BenchmarkEmitSync(b *testing.B) {
-	e := NewMemoryEmitter()
-	_, _ = e.On("bench.topic", func(evt Event) error {
-		return nil
-	})
-
-	b.ResetTimer()
+func BenchmarkEmitExactNoListener(b *testing.B) {
+	e := New()
+	defer e.Close()
+	ctx := context.Background()
 	for b.Loop() {
-		e.EmitSync("bench.topic", "payload")
+		_ = e.Emit(ctx, "user.created", nil)
 	}
 }
 
-// BenchmarkEmitAsync benchmarks asynchronous event emission with a single listener.
-func BenchmarkEmitAsync(b *testing.B) {
-	e := NewMemoryEmitter()
-	_, _ = e.On("bench.topic", func(evt Event) error {
-		return nil
-	})
+func BenchmarkEmitExactSingleListener(b *testing.B) {
+	e := New()
+	defer e.Close()
+	_, _ = e.On("user.created", func(context.Context, Event) error { return nil })
 
-	b.ResetTimer()
+	ctx := context.Background()
 	for b.Loop() {
-		errChan := e.Emit("bench.topic", "payload")
-		for range errChan {
-		}
+		_ = e.Emit(ctx, "user.created", nil)
 	}
 }
 
-// BenchmarkEmitSyncMultipleListeners benchmarks synchronous emission
-// with multiple listeners at different priorities.
-func BenchmarkEmitSyncMultipleListeners(b *testing.B) {
-	e := NewMemoryEmitter()
-	for _, p := range []Priority{Highest, High, Normal, Low, Lowest} {
-		_, _ = e.On("bench.topic", func(evt Event) error {
-			return nil
-		}, WithPriority(p))
+func BenchmarkEmitExactManyListeners(b *testing.B) {
+	const n = 16
+	e := New()
+	defer e.Close()
+	for range n {
+		_, _ = e.On("user.created", func(context.Context, Event) error { return nil })
 	}
 
-	b.ResetTimer()
+	ctx := context.Background()
 	for b.Loop() {
-		e.EmitSync("bench.topic", "payload")
+		_ = e.Emit(ctx, "user.created", nil)
 	}
 }
 
-// BenchmarkOnOff benchmarks listener registration and removal.
-func BenchmarkOnOff(b *testing.B) {
-	e := NewMemoryEmitter()
-	listener := func(evt Event) error { return nil }
+func BenchmarkEmitWildcard(b *testing.B) {
+	e := New()
+	defer e.Close()
+	_, _ = e.On("user.**", func(context.Context, Event) error { return nil })
 
-	b.ResetTimer()
+	ctx := context.Background()
 	for b.Loop() {
-		id, _ := e.On("bench.topic", listener)
-		_ = e.Off("bench.topic", id)
+		_ = e.Emit(ctx, "user.created", nil)
 	}
 }
 
-// BenchmarkMatchTopicPattern benchmarks wildcard topic pattern matching.
-func BenchmarkMatchTopicPattern(b *testing.B) {
-	patterns := []struct {
-		name    string
-		pattern string
-		subject string
-	}{
-		{"exact", "event.user.created", "event.user.created"},
-		{"single_wildcard", "event.*.created", "event.user.created"},
-		{"multi_wildcard", "event.**", "event.user.created"},
-		{"complex", "**.user.*", "app.event.user.created"},
+func BenchmarkEmitMixedRouting(b *testing.B) {
+	e := New()
+	defer e.Close()
+	for i := range 8 {
+		topic := "exact." + strconv.Itoa(i)
+		_, _ = e.On(topic, func(context.Context, Event) error { return nil })
 	}
-
-	for _, p := range patterns {
-		b.Run(p.name, func(b *testing.B) {
-			for b.Loop() {
-				matchTopicPattern(p.pattern, p.subject)
-			}
-		})
+	for i := range 4 {
+		_, _ = e.On("wild."+strconv.Itoa(i)+".*", func(context.Context, Event) error { return nil })
 	}
-}
+	_, _ = e.On("**", func(context.Context, Event) error { return nil })
 
-// BenchmarkNewBaseEvent benchmarks event creation.
-func BenchmarkNewBaseEvent(b *testing.B) {
+	ctx := context.Background()
 	for b.Loop() {
-		NewBaseEvent("bench.topic", "payload")
+		_ = e.Emit(ctx, "wild.2.evt", nil)
 	}
 }
 
-// BenchmarkEmitSyncWildcard benchmarks synchronous emission with
-// wildcard pattern matching.
-func BenchmarkEmitSyncWildcard(b *testing.B) {
-	e := NewMemoryEmitter()
-	_, _ = e.On("bench.**", func(evt Event) error {
-		return nil
-	})
+func BenchmarkEmitConcurrent(b *testing.B) {
+	e := New()
+	defer e.Close()
+	_, _ = e.On("evt", func(context.Context, Event) error { return nil })
 
-	b.ResetTimer()
-	for b.Loop() {
-		e.EmitSync("bench.topic.deep", "payload")
-	}
-}
-
-// BenchmarkEmitSyncParallel benchmarks synchronous emission under
-// concurrent load.
-func BenchmarkEmitSyncParallel(b *testing.B) {
-	e := NewMemoryEmitter()
-	_, _ = e.On("bench.topic", func(evt Event) error {
-		return nil
-	})
-
-	b.ResetTimer()
+	ctx := context.Background()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			e.EmitSync("bench.topic", "payload")
+			_ = e.Emit(ctx, "evt", nil)
 		}
 	})
 }
 
-// BenchmarkTopicAddRemoveListener benchmarks adding and removing
-// listeners directly on a Topic.
-func BenchmarkTopicAddRemoveListener(b *testing.B) {
-	topic := NewTopic()
-	listener := func(evt Event) error { return nil }
-
-	b.ResetTimer()
+func BenchmarkOnAndCancel(b *testing.B) {
+	e := New()
+	defer e.Close()
 	for b.Loop() {
-		id := fmt.Sprintf("listener-%d", b.N)
-		topic.AddListener(id, listener, WithPriority(Normal))
-		_ = topic.RemoveListener(id)
+		s, _ := e.On("evt", func(context.Context, Event) error { return nil })
+		s.Cancel()
 	}
 }

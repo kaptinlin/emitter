@@ -3,71 +3,85 @@ package emitter
 import "strings"
 
 const (
-	// SingleWildcard matches exactly one topic segment.
-	SingleWildcard = "*"
-	// MultiWildcard matches zero or more topic segments.
-	MultiWildcard = "**"
+	singleWildcard = "*"
+	multiWildcard  = "**"
 )
 
-// matchTopicPattern reports whether subject matches pattern.
-func matchTopicPattern(pattern, subject string) bool {
-	if pattern == subject {
-		return true
-	}
-
-	patternParts := strings.Split(pattern, ".")
-	subjectParts := strings.Split(subject, ".")
-
-	// "event.**" should not match bare "event"
-	if len(patternParts) > 1 &&
-		patternParts[len(patternParts)-1] == MultiWildcard &&
-		len(subjectParts) == 1 &&
-		subjectParts[0] == patternParts[0] {
+// isValidTopicName reports whether s satisfies the topic grammar.
+//
+//	topic    := segment ('.' segment)*
+//	segment  := name | wildcard
+//	name     := [a-zA-Z0-9_-]+
+//	wildcard := '*' | '**'
+func isValidTopicName(s string) bool {
+	if s == "" {
 		return false
 	}
-
-	var matchParts func(p, s int) bool
-	matchParts = func(p, s int) bool {
-		if p == len(patternParts) && s == len(subjectParts) {
-			return true
-		}
-
-		// Subject exhausted: remaining pattern parts must all be "**"
-		if s == len(subjectParts) {
-			for i := range len(patternParts) - p {
-				if patternParts[p+i] != MultiWildcard {
-					return false
-				}
-			}
-			return true
-		}
-
-		if p == len(patternParts) {
+	for seg := range strings.SplitSeq(s, ".") {
+		if !isValidSegment(seg) {
 			return false
-		}
-
-		switch patternParts[p] {
-		case SingleWildcard:
-			return s < len(subjectParts) && matchParts(p+1, s+1)
-		case MultiWildcard:
-			if p == len(patternParts)-1 {
-				return true
-			}
-			for i := range len(subjectParts) - s + 1 {
-				if matchParts(p+1, s+i) {
-					return true
-				}
-			}
-			return false
-		default:
-			return patternParts[p] == subjectParts[s] && matchParts(p+1, s+1)
 		}
 	}
-
-	return matchParts(0, 0)
+	return true
 }
 
-// isValidTopicName reports whether topicName is valid.
-func isValidTopicName(topicName string) bool {
-	return topicName != "" && !strings.ContainsAny(topicName, "?[")
+func isValidSegment(s string) bool {
+	if s == singleWildcard || s == multiWildcard {
+		return true
+	}
+	if s == "" {
+		return false
+	}
+	for _, r := range s {
+		if !isNameByte(r) {
+			return false
+		}
+	}
+	return true
+}
+
+func isNameByte(r rune) bool {
+	switch {
+	case r >= 'a' && r <= 'z':
+	case r >= 'A' && r <= 'Z':
+	case r >= '0' && r <= '9':
+	case r == '_' || r == '-':
+	default:
+		return false
+	}
+	return true
+}
+
+// hasWildcard reports whether pattern contains a wildcard segment.
+// Cheaper than splitting; a literal '*' character can only appear as a
+// wildcard segment under the topic grammar.
+func hasWildcard(pattern string) bool {
+	return strings.Contains(pattern, "*")
+}
+
+// matchParts reports whether sp matches pattern parts pp from indices p, s.
+// '*' matches exactly one segment; '**' matches zero or more segments.
+func matchParts(pp, sp []string, p, s int) bool {
+	if p == len(pp) {
+		return s == len(sp)
+	}
+	if pp[p] == multiWildcard {
+		// ** matches zero or more segments.
+		for i := s; i <= len(sp); i++ {
+			if matchParts(pp, sp, p+1, i) {
+				return true
+			}
+		}
+		return false
+	}
+	if s == len(sp) {
+		return false
+	}
+	if pp[p] == singleWildcard {
+		return matchParts(pp, sp, p+1, s+1)
+	}
+	if pp[p] == sp[s] {
+		return matchParts(pp, sp, p+1, s+1)
+	}
+	return false
 }

@@ -1,44 +1,40 @@
 package emitter
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
-// FuzzMatchTopicPattern fuzzes the matchTopicPattern function to ensure it doesn't panic
 func FuzzMatchTopicPattern(f *testing.F) {
-	// Add seed corpus for common patterns
-	f.Add("event.*", "event.test")
-	f.Add("event.**", "event.some.thing")
-	f.Add("*.run", "event.run")
-	f.Add("**", "any.topic.here")
-	f.Add("event.some.*.*", "event.some.thing.run")
-	f.Add("**.thing.run", "event.some.thing.run")
-	f.Add("exact.match", "exact.match")
-	f.Add("", "")
-	f.Add("*", "single")
-	f.Add("a.b.c", "a.b.c.d")
+	f.Add("user.created", "user.created")
+	f.Add("user.*", "user.created")
+	f.Add("user.**", "user.a.b.c")
+	f.Add("**", "any.deep.path")
+	f.Add("a.**.z", "a.b.c.z")
+	f.Add("a.*.b", "a.x.b")
 
 	f.Fuzz(func(t *testing.T, pattern, subject string) {
-		// Ensure function doesn't panic
-		defer func() {
-			if r := recover(); r != nil {
-				t.Errorf("matchTopicPattern panicked with pattern=%q, subject=%q: %v", pattern, subject, r)
-			}
-		}()
+		// Skip inputs that violate the topic grammar — fuzzing is for the
+		// matcher, not the validator.
+		if !isValidTopicName(pattern) || !isValidTopicName(subject) {
+			return
+		}
+		// Subject must have no wildcards to be a valid emit target.
+		if strings.Contains(subject, "*") {
+			return
+		}
 
-		// Call the function under test
-		result := matchTopicPattern(pattern, subject)
-
-		// Basic sanity checks
-		if pattern == subject && len(pattern) > 0 {
-			// Exact matches should always return true (except empty strings)
-			if !result {
-				t.Logf("Exact match failed: pattern=%q, subject=%q", pattern, subject)
+		// Property: matchTopicPattern is reflexive when pattern == subject and both literal.
+		if pattern == subject {
+			if !matchTopicPattern(pattern, subject) {
+				t.Errorf("reflexivity broken: %q !~ %q", pattern, subject)
 			}
 		}
 
-		if pattern == "**" && len(subject) > 0 {
-			// Double wildcard should match any non-empty string
-			if !result {
-				t.Logf("Double wildcard match failed: pattern=%q, subject=%q", pattern, subject)
+		// Property: ** alone matches any valid subject.
+		if pattern == "**" {
+			if !matchTopicPattern(pattern, subject) {
+				t.Errorf("** failed to match %q", subject)
 			}
 		}
 	})

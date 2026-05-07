@@ -1,7 +1,18 @@
-// Package emitter provides an in-memory, thread-safe event emitter with
-// wildcard topics and priority-ordered listeners.
+// Package emitter is an in-memory pub/sub primitive.
 //
-// Emit and EmitSync recover listener panics and return them as errors matching
-// ErrListenerPanic. The package has no Must-style APIs and its public runtime
-// operations are intended to return errors instead of panicking.
+// # Topic grammar (EBNF)
+//
+//	topic    := segment ('.' segment)*
+//	segment  := name | wildcard
+//	name     := [a-zA-Z0-9_-]+
+//	wildcard := '*' | '**'
+//
+// '*' matches exactly one segment. '**' matches zero or more segments;
+// for example, "event.**" matches "event", "event.x", and "event.x.y".
+//
+// Listeners run synchronously in priority order (high to low) within a topic.
+// Emit returns errors.Join of all listener errors. Listener panics are
+// wrapped as PanicError; check with errors.Is(err, ErrListenerPanic).
+//
+// Context cancellation stops further listener invocation within an emit.
 package emitter

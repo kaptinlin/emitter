@@ -3,45 +3,40 @@ package emitter
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewBaseEvent(t *testing.T) {
-	payload := map[string]string{"key": "value"} // Payload is a map
-	event := NewBaseEvent("test_topic", payload)
-
-	assert.Equal(t, "test_topic", event.Topic())
-
-	retrievedPayload, ok := event.Payload().(map[string]string)
-	require.True(t, ok, "Payload is not of type map[string]string")
-
-	assert.Equal(t, "value", retrievedPayload["key"])
-}
-
-func TestBaseEventSetAbortedAndIsAborted(t *testing.T) {
-	type Payload struct {
-		Data string
-	}
-
-	event := NewBaseEvent("test_topic", Payload{Data: "some data"}) // Payload is a struct
-
-	assert.False(t, event.IsAborted(), "Newly created event should not be aborted")
-
-	event.SetAborted(true)
-	assert.True(t, event.IsAborted(), "BaseEvent.Abort(true) did not abort the event")
-
-	event.SetAborted(false)
-	assert.False(t, event.IsAborted(), "BaseEvent.Abort(false) did not unabort the event")
-}
-
-func TestBaseEventSetPayload(t *testing.T) {
+func TestEventTopic(t *testing.T) {
 	t.Parallel()
+	ev := &event{topic: "user.created"}
+	require.Equal(t, "user.created", ev.Topic())
+}
 
-	event := NewBaseEvent("test_topic", "initial")
-	event.SetPayload(map[string]string{"key": "updated"})
+func TestEventPayload(t *testing.T) {
+	t.Parallel()
+	ev := &event{payload: 42}
+	require.Equal(t, 42, ev.Payload())
+}
 
-	retrievedPayload, ok := event.Payload().(map[string]string)
-	require.True(t, ok, "Payload is not of type map[string]string")
-	assert.Equal(t, "updated", retrievedPayload["key"])
+func TestEventPayloadNil(t *testing.T) {
+	t.Parallel()
+	ev := &event{}
+	require.Nil(t, ev.Payload())
+}
+
+func TestEventStop(t *testing.T) {
+	t.Parallel()
+	ev := &event{}
+	require.False(t, ev.stopped)
+	ev.Stop()
+	require.True(t, ev.stopped)
+}
+
+func TestEventStopIdempotent(t *testing.T) {
+	t.Parallel()
+	ev := &event{}
+	ev.Stop()
+	ev.Stop()
+	ev.Stop()
+	require.True(t, ev.stopped)
 }

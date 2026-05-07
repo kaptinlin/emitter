@@ -1,0 +1,17 @@
+module github.com/kaptinlin/emitter/pool
+
+go 1.26.2
+
+require (
+	github.com/alitto/pond v1.9.2
+	github.com/kaptinlin/emitter v0.0.0
+	github.com/stretchr/testify v1.11.1
+)
+
+require (
+	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/pmezard/go-difflib v1.0.0 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
+)
+
+replace github.com/kaptinlin/emitter => ../

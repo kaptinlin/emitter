@@ -6,43 +6,41 @@ import (
 )
 
 var (
-	// ErrNilListener is returned when On receives a nil listener.
-	ErrNilListener = errors.New("listener cannot be nil")
-	// ErrInvalidTopicName is returned when a topic name is invalid.
-	ErrInvalidTopicName = errors.New("invalid topic name")
-	// ErrInvalidPriority is returned when a priority is invalid.
-	ErrInvalidPriority = errors.New("invalid priority")
+	// ErrEmitterClosed is returned when an operation is performed on a closed Emitter.
+	ErrEmitterClosed = errors.New("emitter: closed")
 
-	// ErrTopicNotFound is returned when a topic does not exist.
-	ErrTopicNotFound = errors.New("topic not found")
-	// ErrListenerNotFound is returned when a listener ID does not exist.
-	ErrListenerNotFound = errors.New("listener not found")
+	// ErrInvalidTopicName is returned when a topic name does not satisfy the topic grammar.
+	ErrInvalidTopicName = errors.New("emitter: invalid topic name")
 
-	// ErrEmitterClosed is returned when an operation uses a closed emitter.
-	ErrEmitterClosed = errors.New("emitter is closed")
-	// ErrEmitterAlreadyClosed is returned when Close is called more than once.
-	ErrEmitterAlreadyClosed = errors.New("emitter is already closed")
-	// ErrListenerPanic marks an error that came from a recovered listener panic.
-	ErrListenerPanic = errors.New("listener panicked")
+	// ErrNilListener is returned when On is called with a nil listener.
+	ErrNilListener = errors.New("emitter: nil listener")
+
+	// ErrListenerPanic marks an error that originates from a recovered listener panic.
+	// Use errors.Is(err, ErrListenerPanic) to detect it.
+	ErrListenerPanic = errors.New("emitter: listener panicked")
+
+	// ErrPayloadType is returned by Subscribe[T] when the emitted payload does not match T.
+	ErrPayloadType = errors.New("emitter: payload type mismatch")
 )
 
 // PanicError wraps a recovered listener panic.
+// Inspect the recovered value via Value; the error chain includes ErrListenerPanic
+// and the original error (if the panic value was an error).
 type PanicError struct {
-	// Value is the recovered panic value.
+	// Value is the original recovered value (any).
 	Value any
-	// Cause is the recovered value when it implements error.
-	Cause error
+	cause error
 }
 
-// Error returns the panic error message.
+// Error implements error.
 func (e *PanicError) Error() string {
 	return fmt.Sprintf("emitter: listener panicked: %v", e.Value)
 }
 
-// Unwrap returns ErrListenerPanic and the recovered error, when available.
-func (e *PanicError) Unwrap() error {
-	if e.Cause != nil {
-		return errors.Join(ErrListenerPanic, e.Cause)
+// Unwrap returns the chained errors so errors.Is and errors.As traverse them.
+func (e *PanicError) Unwrap() []error {
+	if e.cause != nil {
+		return []error{ErrListenerPanic, e.cause}
 	}
-	return ErrListenerPanic
+	return []error{ErrListenerPanic}
 }

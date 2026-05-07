@@ -1,61 +1,25 @@
 package emitter
 
-import "sync/atomic"
-
-// Event represents a value being emitted through a topic.
+// Event is the read-only view delivered to a [Listener] for a single emission.
+// Payload is immutable for the lifetime of an emit.
 type Event interface {
-	// Topic returns the event topic.
+	// Topic returns the topic the event was emitted on.
 	Topic() string
-	// Payload returns the event payload.
+	// Payload returns the value passed to Emit.
 	Payload() any
-	// SetPayload replaces the event payload.
-	SetPayload(any)
-	// SetAborted stops delivery to remaining listeners.
-	SetAborted(bool)
-	// IsAborted reports whether delivery has been stopped.
-	IsAborted() bool
+	// Stop halts dispatch to remaining listeners within this emit.
+	Stop()
 }
 
-// BaseEvent is the default [Event] implementation.
-type BaseEvent struct {
+// event is the internal Event implementation.
+// It is created once per emit and accessed serially by listeners,
+// so it does not need atomic fields.
+type event struct {
 	topic   string
-	payload atomic.Pointer[any]
-	aborted atomic.Bool
+	payload any
+	stopped bool
 }
 
-// NewBaseEvent returns a [BaseEvent] for topic and payload.
-func NewBaseEvent(topic string, payload any) *BaseEvent {
-	e := &BaseEvent{
-		topic: topic,
-	}
-	e.payload.Store(&payload)
-	return e
-}
-
-// Topic returns the event topic.
-func (e *BaseEvent) Topic() string {
-	return e.topic
-}
-
-// Payload returns the event payload.
-func (e *BaseEvent) Payload() any {
-	if p := e.payload.Load(); p != nil {
-		return *p
-	}
-	return nil
-}
-
-// SetPayload replaces the event payload.
-func (e *BaseEvent) SetPayload(payload any) {
-	e.payload.Store(&payload)
-}
-
-// SetAborted stops delivery to remaining listeners.
-func (e *BaseEvent) SetAborted(abort bool) {
-	e.aborted.Store(abort)
-}
-
-// IsAborted reports whether delivery has been stopped.
-func (e *BaseEvent) IsAborted() bool {
-	return e.aborted.Load()
-}
+func (e *event) Topic() string { return e.topic }
+func (e *event) Payload() any  { return e.payload }
+func (e *event) Stop()         { e.stopped = true }

@@ -1,152 +1,149 @@
 package emitter
 
 import (
+	"context"
 	"errors"
-	"fmt"
 	"sync"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-var errListenerBase = errors.New("listener error base")
+func TestBucketAddPriorityOrder(t *testing.T) {
+	t.Parallel()
+	b := newBucket()
 
-// mockListener simulates a listener function for testing.
-func mockListener(id string, shouldError bool) Listener {
-	return func(e Event) error {
-		if shouldError {
-			return fmt.Errorf("listener error %s: %w", id, errListenerBase)
-		}
-		return nil
+	items := []*listenerItem{
+		{id: 1, priority: Normal},
+		{id: 2, priority: Highest},
+		{id: 3, priority: Low},
+		{id: 4, priority: High},
+		{id: 5, priority: Lowest},
 	}
+	for _, it := range items {
+		it.listener = func(context.Context, Event) error { return nil }
+		b.add(it)
+	}
+
+	got := make([]uint64, 0, len(b.sorted))
+	for _, it := range b.sorted {
+		got = append(got, it.id)
+	}
+	require.Equal(t, []uint64{2, 4, 1, 3, 5}, got)
 }
 
-func TestNewTopic(t *testing.T) {
-	topic := NewTopic()
-	assert.NotNil(t, topic, "NewTopic() should not return nil")
+func TestBucketAddPreservesRegistrationOrderAtEqualPriority(t *testing.T) {
+	t.Parallel()
+	b := newBucket()
+	for i := range 5 {
+		b.add(&listenerItem{
+			id:       uint64(i + 1),
+			priority: Normal,
+			listener: func(context.Context, Event) error { return nil },
+		})
+	}
+	got := make([]uint64, 0, len(b.sorted))
+	for _, it := range b.sorted {
+		got = append(got, it.id)
+	}
+	require.Equal(t, []uint64{1, 2, 3, 4, 5}, got)
 }
 
-func TestAddRemoveListener(t *testing.T) {
-	topic := NewTopic()
-	listener1 := mockListener("1", false)
-	listener2 := mockListener("2", false)
-
-	id1 := "1"
-	topic.AddListener(id1, listener1)
-	assert.Len(t, topic.listeners, 1, "AddListener() failed to add listener 1")
-
-	id2 := "2"
-	topic.AddListener(id2, listener2)
-	assert.Len(t, topic.listeners, 2, "AddListener() failed to add listener 2")
-
-	err := topic.RemoveListener(id1)
-	require.NoError(t, err, "RemoveListener() failed to remove listener 1")
-	assert.Len(t, topic.listeners, 1, "RemoveListener() failed to remove listener 1")
-
-	err = topic.RemoveListener(id2)
-	require.NoError(t, err, "RemoveListener() failed to remove listener 2")
-	assert.Empty(t, topic.listeners, "RemoveListener() failed to remove listener 2")
+func TestBucketRemoveReturnsTrueWhenFound(t *testing.T) {
+	t.Parallel()
+	b := newBucket()
+	b.add(&listenerItem{id: 1, listener: func(context.Context, Event) error { return nil }})
+	require.True(t, b.remove(1))
+	require.False(t, b.remove(1)) // already removed
+	require.False(t, b.remove(99))
 }
 
-func TestRemoveListenerPreservesPriorityOrder(t *testing.T) {
-	topic := NewTopic()
-	callOrder := make([]string, 0, 2)
+func TestBucketTriggerSnapshotsListeners(t *testing.T) {
+	t.Parallel()
+	b := newBucket()
 
-	topic.AddListener("normal", func(Event) error {
-		callOrder = append(callOrder, "normal")
-		return nil
+	// First listener registers a second one mid-dispatch — the new one must
+	// not run during this trigger because dispatch operates on a snapshot.
+	var ranLate bool
+	b.add(&listenerItem{
+		id:       1,
+		priority: Normal,
+		listener: func(context.Context, Event) error {
+			b.add(&listenerItem{
+				id:       2,
+				priority: Normal,
+				listener: func(context.Context, Event) error {
+					ranLate = true
+					return nil
+				},
+			})
+			return nil
+		},
 	})
-	topic.AddListener("low", func(Event) error {
-		callOrder = append(callOrder, "low")
-		return nil
-	}, WithPriority(Low))
-	topic.AddListener("highest", func(Event) error {
-		callOrder = append(callOrder, "highest")
-		return nil
-	}, WithPriority(Highest))
 
-	err := topic.RemoveListener("normal")
-	require.NoError(t, err)
-
-	errList := topic.Trigger(NewBaseEvent("test", nil))
-	require.Empty(t, errList)
-	assert.Equal(t, []string{"highest", "low"}, callOrder)
+	errs := b.trigger(context.Background(), &event{topic: "x"})
+	require.Empty(t, errs)
+	require.False(t, ranLate, "newly added listener must not fire during in-flight trigger")
 }
 
-func TestTriggerListeners(t *testing.T) {
-	topic := NewTopic()
+func TestBucketTriggerJoinsErrors(t *testing.T) {
+	t.Parallel()
+	b := newBucket()
 
-	type Payload struct {
-		Data string
-	}
+	errA := errors.New("a")
+	errB := errors.New("b")
+	b.add(&listenerItem{id: 1, listener: func(context.Context, Event) error { return errA }})
+	b.add(&listenerItem{id: 2, listener: func(context.Context, Event) error { return errB }})
 
-	event := NewBaseEvent("test", Payload{Data: "value"}) // Assumes NewBaseEvent is modified to work without generics
+	errs := b.trigger(context.Background(), &event{topic: "x"})
+	require.Len(t, errs, 2)
+}
 
-	// Add listeners
-	topic.AddListener("1", mockListener("1", false))
-	topic.AddListener("2", mockListener("2", true))
+func TestBucketTriggerStopHaltsLoop(t *testing.T) {
+	t.Parallel()
+	b := newBucket()
+
+	var second bool
+	b.add(&listenerItem{
+		id: 1, priority: High,
+		listener: func(_ context.Context, ev Event) error {
+			ev.Stop()
+			return nil
+		},
+	})
+	b.add(&listenerItem{
+		id: 2, priority: Low,
+		listener: func(context.Context, Event) error {
+			second = true
+			return nil
+		},
+	})
+
+	_ = b.trigger(context.Background(), &event{topic: "x"})
+	require.False(t, second)
+}
+
+func TestBucketRemoveDuringTriggerIsSafe(t *testing.T) {
+	t.Parallel()
+	b := newBucket()
 
 	var wg sync.WaitGroup
+	for i := range 8 {
+		b.add(&listenerItem{
+			id:       uint64(i + 1),
+			listener: func(context.Context, Event) error { return nil },
+		})
+	}
 
 	wg.Go(func() {
-		errList := topic.Trigger(event)
-		require.Len(t, errList, 1, "Trigger() should return exactly 1 error")
-		assert.ErrorIs(t, errList[0], errListenerBase)
+		for range 100 {
+			_ = b.trigger(context.Background(), &event{topic: "x"})
+		}
 	})
-
+	for i := range 8 {
+		wg.Go(func() {
+			b.remove(uint64(i + 1))
+		})
+	}
 	wg.Wait()
-}
-
-func TestRemoveListenerMissing(t *testing.T) {
-	t.Parallel()
-
-	topic := NewTopic()
-	assert.ErrorIs(t, topic.RemoveListener("missing"), ErrListenerNotFound)
-}
-
-func TestTriggerStopsAfterAbort(t *testing.T) {
-	t.Parallel()
-
-	topic := NewTopic()
-	var callOrder []string
-
-	topic.AddListener("first", func(e Event) error {
-		callOrder = append(callOrder, "first")
-		e.SetAborted(true)
-		return nil
-	}, WithPriority(High))
-	topic.AddListener("second", func(Event) error {
-		callOrder = append(callOrder, "second")
-		return nil
-	}, WithPriority(Low))
-
-	errList := topic.Trigger(NewBaseEvent("test", nil))
-	require.Empty(t, errList)
-	assert.Equal(t, []string{"first"}, callOrder)
-}
-
-func TestTriggerRecoversPanicAsPanicError(t *testing.T) {
-	t.Parallel()
-
-	topic := NewTopic()
-	topic.AddListener("panic", func(Event) error {
-		panic(errListenerBase)
-	})
-
-	errList := topic.Trigger(NewBaseEvent("test", nil))
-	require.Len(t, errList, 1)
-	assert.ErrorIs(t, errList[0], ErrListenerPanic)
-	assert.ErrorIs(t, errList[0], errListenerBase)
-
-	var panicErr *PanicError
-	require.ErrorAs(t, errList[0], &panicErr)
-	assert.Equal(t, errListenerBase, panicErr.Value)
-}
-
-func TestWildcardConstants(t *testing.T) {
-	t.Parallel()
-
-	assert.Equal(t, "*", SingleWildcard)
-	assert.Equal(t, "**", MultiWildcard)
 }

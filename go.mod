@@ -2,11 +2,7 @@ module github.com/kaptinlin/emitter
 
 go 1.26.2
 
-require (
-	github.com/alitto/pond v1.9.2
-	github.com/google/uuid v1.6.0
-	github.com/stretchr/testify v1.11.1
-)
+require github.com/stretchr/testify v1.11.1
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect

@@ -1,138 +1,176 @@
 # emitter
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/kaptinlin/emitter.svg)](https://pkg.go.dev/github.com/kaptinlin/emitter)
 [![Go Report Card](https://goreportcard.com/badge/github.com/kaptinlin/emitter)](https://goreportcard.com/report/github.com/kaptinlin/emitter)
 [![Go Version](https://img.shields.io/badge/Go-1.26.2+-blue.svg)](https://go.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A thread-safe in-memory event emitter for Go with wildcard topics, listener priorities, and optional goroutine pooling
+An in-memory pub/sub primitive for Go. Synchronous, ordered, panic-safe — and small enough to read in a sitting.
 
-## Features
+## Why
 
-- **In-memory core**: Keep event routing local with no broker or storage dependency.
-- **Wildcard topics**: Match one segment with `*` and zero or more segments with `**`.
-- **Priority ordering**: Run higher-priority listeners before lower-priority listeners.
-- **Sync and async delivery**: Use `EmitSync` for immediate results or `Emit` for channel-based delivery.
-- **Panic recovery**: Recover listener panics and surface them as errors matching `ErrListenerPanic`.
-- **Pool integration**: Route async work through `PondPool` or any custom `Pool` implementation.
+Most "event bus" libraries grow into protocol shims, retry machinery, or transport layers. `emitter` does one thing: deliver events in-process, in order, with predictable failure modes.
 
-## Installation
+- **One emitter, many topics.** No generic-typed bus that pins every event to a single payload type.
+- **Synchronous dispatch.** Listeners run in priority order; `Emit` returns once they all finish.
+- **Wildcard subscriptions.** `*` matches one segment, `**` matches zero or more.
+- **Panic recovery.** Listener panics surface as errors that wrap `ErrListenerPanic`.
+- **Zero third-party dependencies.** Stdlib only in the core package.
 
-Requires Go 1.26.2 or newer.
+For high-throughput fire-and-forget dispatch, an optional sibling module ([`emitter/pool`](pool/)) adds a bounded asynchronous dispatcher.
+
+### When not to use it
+
+`emitter` is an in-process primitive. Reach for a broker (NATS, Kafka, Redis Streams) when you need persistence, cross-process delivery, retries, or replay. Reach for `chan` when one producer talks to one consumer with backpressure. Reach for `errgroup` / `sync.WaitGroup` when you're orchestrating goroutines, not events.
+
+## Install
 
 ```bash
 go get github.com/kaptinlin/emitter
 ```
 
-## Quick Start
+Requires Go 1.26.2+.
+
+## Quick start
 
 ```go
 package main
 
 import (
-	"fmt"
-	"log"
+    "context"
+    "fmt"
 
-	"github.com/kaptinlin/emitter"
+    "github.com/kaptinlin/emitter"
 )
 
 func main() {
-	bus := emitter.NewMemoryEmitter()
+    e := emitter.New()
+    defer e.Close()
 
-	_, err := bus.On("user.created", func(evt emitter.Event) error {
-		fmt.Printf("%s %v\n", evt.Topic(), evt.Payload())
-		return nil
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
+    _, _ = e.On("user.created", func(_ context.Context, ev emitter.Event) error {
+        fmt.Printf("%s %v\n", ev.Topic(), ev.Payload())
+        return nil
+    })
 
-	errs := bus.EmitSync("user.created", "alice@example.com")
-	if len(errs) > 0 {
-		log.Fatalf("listener errors: %v", errs)
-	}
+    _ = e.Emit(context.Background(), "user.created", "alice@example.com")
 }
 ```
 
-## API Overview
+More runnable examples in [`examples/`](examples/).
 
-| API | Purpose |
+## Concepts
+
+| Type | Purpose |
 | --- | --- |
-| `NewMemoryEmitter(opts...)` | Create an emitter with optional configuration. |
-| `On(topic, listener, opts...)` | Register a listener and get back its listener ID. |
-| `Off(topic, listenerID)` | Remove a listener by topic and ID. |
-| `Emit(topic, payload)` | Emit asynchronously and receive listener errors on a channel. |
-| `EmitSync(topic, payload)` | Emit synchronously and receive listener errors as a slice. |
-| `EnsureTopic(name)` / `GetTopic(name)` | Create or fetch a concrete topic registry. |
-| `Close()` | Clear topics and release the configured pool. |
+| `Emitter` | Owns topic routing and dispatch. Construct with `New`. |
+| `Listener` | `func(ctx context.Context, ev Event) error`. |
+| `Event` | Read-only view of the in-flight emission: `Topic()`, `Payload()`, `Stop()`. |
+| `Subscription` | Handle returned by `On`; call `Cancel()` to remove the listener. |
+| `Priority` | Plain `int`. Higher runs first. Sentinels: `Lowest`, `Low`, `Normal`, `High`, `Highest`. |
 
-Full API docs: [pkg.go.dev/github.com/kaptinlin/emitter](https://pkg.go.dev/github.com/kaptinlin/emitter)
+## Topic grammar
 
-## Topic Patterns
-
-- `user.created` matches only `user.created`
-- `user.*` matches `user.created` and `user.deleted`
-- `order.**` matches `order.created` and `order.item.added`
-- `event.**` does not match bare `event`
-
-## Listener Priorities
-
-Use `WithPriority` when listener order matters.
-Higher priorities run first: `Highest`, `High`, `Normal`, `Low`, `Lowest`.
-
-```go
-_, _ = bus.On("order.created", validateOrder, emitter.WithPriority(emitter.Highest))
-_, _ = bus.On("order.created", persistOrder, emitter.WithPriority(emitter.Normal))
-_, _ = bus.On("order.created", auditOrder, emitter.WithPriority(emitter.Low))
+```ebnf
+topic    := segment ('.' segment)*
+segment  := name | wildcard
+name     := [a-zA-Z0-9_-]+
+wildcard := '*' | '**'
 ```
 
-## Configuration
-
-| Option | Purpose |
-| --- | --- |
-| `WithErrorHandler(func(Event, error) error)` | Rewrite, wrap, or suppress listener errors. |
-| `WithIDGenerator(func() string)` | Control listener ID generation. |
-| `WithPool(Pool)` | Run `Emit` through a pool. |
-| `WithErrChanBufferSize(int)` | Set the async error channel buffer size. |
-
-## Error Handling
-
-Listener-returned errors flow through the configured error handler.
-Recovered listener panics are returned as `PanicError` values and match `ErrListenerPanic`.
+- `*` matches exactly one segment.
+- `**` matches zero or more segments.
+- Wildcards are valid in subscription patterns only — emit topics must be literal.
 
 ```go
-for err := range bus.Emit("user.created", "alice@example.com") {
-	if err != nil {
-		fmt.Println(err)
-	}
-}
+_, _ = e.On("user.*",    handler) // user.created, user.deleted
+_, _ = e.On("metric.**", handler) // metric, metric.cpu, metric.cpu.idle
+_, _ = e.On("**",        handler) // every topic
 ```
 
-## Examples
+## Listener options
 
-See [examples/README.md](examples/README.md) for runnable examples covering:
+```go
+_, _ = e.On("evt", handler, emitter.WithPriority(emitter.High))
+_, _ = e.On("evt", handler, emitter.Once())
+```
 
-- basic usage
-- wildcard subscriptions
-- listener management
-- custom error handling
-- custom ID generation
-- listener panic recovery
-- goroutine pool integration
+- `WithPriority(p)` overrides the default `Normal`. Higher values run first; equal priorities run in registration order.
+- `Once()` removes the listener after its first invocation. Concurrent emits fire it at most once.
 
-## Development
+## Stopping dispatch
+
+`Event.Stop()` halts remaining listeners for the current emission. It takes effect after the current listener returns:
+
+```go
+_, _ = e.On("evt", func(_ context.Context, ev emitter.Event) error {
+    if shouldShortCircuit() {
+        ev.Stop()
+    }
+    return nil
+}, emitter.WithPriority(emitter.High))
+```
+
+## Errors
+
+```go
+err := e.Emit(ctx, "evt", payload)
+```
+
+- All listener errors are joined via `errors.Join`. Use `errors.Is` / `errors.As` to inspect.
+- A panicking listener returns a `*PanicError` wrapping `ErrListenerPanic`. The raw panic value is on `pe.Value`; if it was an `error`, it appears in the unwrap chain too.
+- Cancelling `ctx` mid-dispatch surfaces `ctx.Err()` in the joined result and skips remaining listeners.
+- Sentinels: `ErrEmitterClosed`, `ErrInvalidTopicName`, `ErrNilListener`, `ErrListenerPanic`, `ErrPayloadType`.
+
+## Typed helpers
+
+For payloads with a known type, the generic helpers add static checking at the boundary without coupling the emitter to a single type:
+
+```go
+type OrderShipped struct{ ID string }
+
+_, _ = emitter.Subscribe(e, "order.shipped",
+    func(_ context.Context, _ emitter.Event, p OrderShipped) error {
+        fmt.Println(p.ID)
+        return nil
+    })
+
+_ = emitter.Publish(context.Background(), e, "order.shipped", OrderShipped{ID: "ord-7"})
+```
+
+If a published payload's dynamic type does not match `T`, the listener is skipped and the emit returns an error wrapping `ErrPayloadType`.
+
+## Asynchronous dispatch (optional)
+
+The core dispatches synchronously. For bounded asynchronous emission with backpressure, import the sibling module:
 
 ```bash
-task test
-task lint
-task test-fuzz
+go get github.com/kaptinlin/emitter/pool
 ```
 
-For development guidelines, see [AGENTS.md](AGENTS.md).
+```go
+import (
+    "context"
 
-## Contributing
+    "github.com/kaptinlin/emitter"
+    "github.com/kaptinlin/emitter/pool"
+)
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+p := pool.New(64, 1024) // 64 workers, queue cap 1024
+defer p.Close()
+
+if err := p.Submit(ctx, e, "user.created", payload); err != nil {
+    // errors.Is(err, pool.ErrPoolFull) under saturation
+}
+```
+
+The pool's underlying engine is an implementation detail; only `Pool`, `New`, `Submit`, `Close`, and `ErrPoolFull` are part of the API.
+
+## Concurrency
+
+- All public methods on `*Emitter` are safe for concurrent use.
+- Each emission takes a snapshot of its listener set, so listeners may freely call `On` / `Cancel` on the same emitter without deadlocking.
+- `Subscription.Cancel` and `Emitter.Close` are both idempotent.
 
 ## License
 
-This project is licensed under the MIT License. See [LICENSE.md](LICENSE.md).
+MIT — see [LICENSE.md](LICENSE.md).
