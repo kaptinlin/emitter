@@ -107,19 +107,20 @@ func (e *Emitter) Emit(ctx context.Context, topic string, payload any) error {
 		}
 	}
 
-	if !ev.stopped {
-		if cur := e.wildcard.Load(); cur != nil && len(*cur) > 0 {
-			subjectParts := strings.Split(topic, ".")
-			for _, w := range *cur {
-				if !matchParts(w.parts, subjectParts, 0, 0) {
-					continue
-				}
-				if list := w.bucket.trigger(ctx, ev); len(list) > 0 {
-					errs = append(errs, list...)
-				}
-				if ev.stopped {
-					break
-				}
+	if ev.stopped {
+		return errors.Join(errs...)
+	}
+	if cur := e.wildcard.Load(); cur != nil && len(*cur) > 0 {
+		subjectParts := strings.Split(topic, ".")
+		for _, w := range *cur {
+			if !matchParts(w.parts, subjectParts, 0, 0) {
+				continue
+			}
+			if list := w.bucket.trigger(ctx, ev); len(list) > 0 {
+				errs = append(errs, list...)
+			}
+			if ev.stopped {
+				break
 			}
 		}
 	}

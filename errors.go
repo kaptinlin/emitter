@@ -32,7 +32,6 @@ type PanicError struct {
 	cause error
 }
 
-// Error implements error.
 func (e *PanicError) Error() string {
 	return fmt.Sprintf("emitter: listener panicked: %v", e.Value)
 }

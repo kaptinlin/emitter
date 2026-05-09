@@ -40,14 +40,12 @@ func (b *bucket) add(it *listenerItem) {
 	b.sorted = slices.Insert(b.sorted, idx, it)
 }
 
-func (b *bucket) remove(id uint64) bool {
+func (b *bucket) remove(id uint64) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	n := len(b.sorted)
 	b.sorted = slices.DeleteFunc(b.sorted, func(it *listenerItem) bool {
 		return it.id == id
 	})
-	return len(b.sorted) != n
 }
 
 // trigger dispatches ev to all registered listeners in priority order.

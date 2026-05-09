@@ -32,20 +32,20 @@ func isValidSegment(s string) bool {
 	if s == "" {
 		return false
 	}
-	for _, r := range s {
-		if !isNameByte(r) {
+	for i := range len(s) {
+		if !isNameByte(s[i]) {
 			return false
 		}
 	}
 	return true
 }
 
-func isNameByte(r rune) bool {
+func isNameByte(b byte) bool {
 	switch {
-	case r >= 'a' && r <= 'z':
-	case r >= 'A' && r <= 'Z':
-	case r >= '0' && r <= '9':
-	case r == '_' || r == '-':
+	case b >= 'a' && b <= 'z':
+	case b >= 'A' && b <= 'Z':
+	case b >= '0' && b <= '9':
+	case b == '_' || b == '-':
 	default:
 		return false
 	}
@@ -66,7 +66,9 @@ func matchParts(pp, sp []string, p, s int) bool {
 		return s == len(sp)
 	}
 	if pp[p] == multiWildcard {
-		// ** matches zero or more segments.
+		if p == len(pp)-1 {
+			return true
+		}
 		for i := s; i <= len(sp); i++ {
 			if matchParts(pp, sp, p+1, i) {
 				return true

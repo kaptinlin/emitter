@@ -101,6 +101,7 @@ func TestMatchTopicPattern(t *testing.T) {
 		{"multi wildcard tail empty", "user.**", "user", true},
 		{"multi wildcard tail one", "user.**", "user.created", true},
 		{"multi wildcard tail many", "user.**", "user.a.b.c", true},
+		{"multi wildcard tail mismatch prefix", "user.**", "admin.a.b.c", false},
 		{"multi wildcard interior", "user.**.v2", "user.v2", true},
 		{"multi wildcard interior with span", "user.**.v2", "user.a.b.v2", true},
 		{"multi wildcard alone matches all", "**", "anything.goes.here", true},

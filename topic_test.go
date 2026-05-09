@@ -49,13 +49,15 @@ func TestBucketAddPreservesRegistrationOrderAtEqualPriority(t *testing.T) {
 	require.Equal(t, []uint64{1, 2, 3, 4, 5}, got)
 }
 
-func TestBucketRemoveReturnsTrueWhenFound(t *testing.T) {
+func TestBucketRemoveDeletesMatchingListener(t *testing.T) {
 	t.Parallel()
 	b := newBucket()
 	b.add(&listenerItem{id: 1, listener: func(context.Context, Event) error { return nil }})
-	require.True(t, b.remove(1))
-	require.False(t, b.remove(1)) // already removed
-	require.False(t, b.remove(99))
+
+	b.remove(1)
+	b.remove(1)
+	b.remove(99)
+	require.Empty(t, b.sorted)
 }
 
 func TestBucketTriggerSnapshotsListeners(t *testing.T) {
