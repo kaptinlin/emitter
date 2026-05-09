@@ -172,18 +172,19 @@ func (e *Emitter) ensureWildcard(pattern string) *bucket {
 }
 
 func (e *Emitter) removeListener(pattern string, id uint64) {
-	if hasWildcard(pattern) {
-		if cur := e.wildcard.Load(); cur != nil {
-			for _, w := range *cur {
-				if w.pattern == pattern {
-					w.bucket.remove(id)
-					return
-				}
-			}
+	if !hasWildcard(pattern) {
+		if v, ok := e.exact.Load(pattern); ok {
+			v.(*bucket).remove(id)
 		}
 		return
 	}
-	if v, ok := e.exact.Load(pattern); ok {
-		v.(*bucket).remove(id)
+
+	if cur := e.wildcard.Load(); cur != nil {
+		for _, w := range *cur {
+			if w.pattern == pattern {
+				w.bucket.remove(id)
+				return
+			}
+		}
 	}
 }

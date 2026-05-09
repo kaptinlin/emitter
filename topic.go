@@ -56,7 +56,7 @@ func (b *bucket) trigger(ctx context.Context, ev *event) []error {
 	b.mu.RUnlock()
 
 	var errs []error
-	var fired []uint64
+	var onceIDs []uint64
 
 	for _, it := range items {
 		if err := ctx.Err(); err != nil {
@@ -64,21 +64,21 @@ func (b *bucket) trigger(ctx context.Context, ev *event) []error {
 			break
 		}
 		if it.once && !it.fired.CompareAndSwap(false, true) {
-			continue // another emit already fired this once-listener
+			continue
 		}
 		if err := safeCall(ctx, it.listener, ev); err != nil {
 			errs = append(errs, err)
 		}
 		if it.once {
-			fired = append(fired, it.id)
+			onceIDs = append(onceIDs, it.id)
 		}
 		if ev.stopped {
 			break
 		}
 	}
 
-	if len(fired) > 0 {
-		b.removeMany(fired)
+	if len(onceIDs) > 0 {
+		b.removeMany(onceIDs)
 	}
 	return errs
 }
