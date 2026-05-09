@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -161,9 +162,7 @@ func (e *Emitter) ensureWildcard(pattern string) *bucket {
 	if cur := e.wildcard.Load(); cur != nil {
 		prev = *cur
 	}
-	next := make([]wildEntry, len(prev), len(prev)+1)
-	copy(next, prev)
-	next = append(next, wildEntry{
+	next := append(slices.Clone(prev), wildEntry{
 		pattern: pattern,
 		parts:   strings.Split(pattern, "."),
 		bucket:  nb,
