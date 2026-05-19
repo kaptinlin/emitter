@@ -44,12 +44,8 @@ type Pool struct {
 // New constructs a Pool. maxWorkers caps concurrent dispatch goroutines;
 // maxQueue caps pending submissions. Both must be >= 1.
 func New(maxWorkers, maxQueue int) *Pool {
-	if maxWorkers < 1 {
-		maxWorkers = 1
-	}
-	if maxQueue < 1 {
-		maxQueue = 1
-	}
+	maxWorkers = max(maxWorkers, 1)
+	maxQueue = max(maxQueue, 1)
 	return &Pool{p: pond.New(maxWorkers, maxQueue, pond.Strategy(pond.Eager()))}
 }
 
