@@ -38,7 +38,6 @@ func New(opts ...Option) *Emitter {
 	for _, opt := range opts {
 		opt(cfg)
 	}
-	_ = cfg
 	return &Emitter{}
 }
 
@@ -150,23 +149,27 @@ func (e *Emitter) ensureExact(pattern string) *bucket {
 func (e *Emitter) ensureWildcard(pattern string) *bucket {
 	e.wildMu.Lock()
 	defer e.wildMu.Unlock()
-	if cur := e.wildcard.Load(); cur != nil {
+
+	cur := e.wildcard.Load()
+	if cur != nil {
 		for _, w := range *cur {
 			if w.pattern == pattern {
 				return w.bucket
 			}
 		}
 	}
+
 	nb := newBucket()
 	var prev []wildEntry
-	if cur := e.wildcard.Load(); cur != nil {
+	if cur != nil {
 		prev = *cur
 	}
-	next := append(slices.Clone(prev), wildEntry{
+	entry := wildEntry{
 		pattern: pattern,
 		parts:   strings.Split(pattern, "."),
 		bucket:  nb,
-	})
+	}
+	next := append(slices.Clone(prev), entry)
 	e.wildcard.Store(&next)
 	return nb
 }
