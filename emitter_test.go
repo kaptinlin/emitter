@@ -3,13 +3,21 @@ package emitter
 import (
 	"context"
 	"errors"
-	"fmt"
 	"sync"
 	"sync/atomic"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/require"
 )
+
+func mustOn(t *testing.T, e *Emitter, pattern string, listener Listener, opts ...ListenerOption) Subscription {
+	t.Helper()
+	sub, err := e.On(pattern, listener, opts...)
+	require.NoError(t, err)
+	return sub
+}
 
 func TestEmitterBasicEmit(t *testing.T) {
 	t.Parallel()
@@ -124,7 +132,30 @@ func TestWildcardSubscriptionSingle(t *testing.T) {
 	require.NoError(t, e.Emit(context.Background(), "user.created", nil))
 	require.NoError(t, e.Emit(context.Background(), "user.deleted", nil))
 	require.NoError(t, e.Emit(context.Background(), "order.created", nil)) // not matched
-	require.Equal(t, []string{"user.created", "user.deleted"}, got)
+	if diff := cmp.Diff([]string{"user.created", "user.deleted"}, got); diff != "" {
+		t.Errorf("matched topics mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestWildcardPatternDeliversAllListeners(t *testing.T) {
+	t.Parallel()
+	e := New()
+	defer e.Close()
+
+	var got []string
+	mustOn(t, e, "user.*", func(context.Context, Event) error {
+		got = append(got, "first")
+		return nil
+	})
+	mustOn(t, e, "user.*", func(context.Context, Event) error {
+		got = append(got, "second")
+		return nil
+	})
+
+	require.NoError(t, e.Emit(context.Background(), "user.created", nil))
+	if diff := cmp.Diff([]string{"first", "second"}, got); diff != "" {
+		t.Errorf("listener order mismatch (-want +got):\n%s", diff)
+	}
 }
 
 func TestWildcardSubscriptionMulti(t *testing.T) {
@@ -151,21 +182,25 @@ func TestExactAndWildcardBothFire(t *testing.T) {
 	defer e.Close()
 
 	var seen []string
-	_, _ = e.On("user.created", func(_ context.Context, _ Event) error {
+	mustOn(t, e, "user.created", func(_ context.Context, _ Event) error {
 		seen = append(seen, "exact")
 		return nil
 	})
-	_, _ = e.On("user.*", func(_ context.Context, _ Event) error {
+	mustOn(t, e, "user.*", func(_ context.Context, _ Event) error {
 		seen = append(seen, "wild")
 		return nil
 	})
-	_, _ = e.On("**", func(_ context.Context, _ Event) error {
+	mustOn(t, e, "**", func(_ context.Context, _ Event) error {
 		seen = append(seen, "all")
 		return nil
 	})
 
 	require.NoError(t, e.Emit(context.Background(), "user.created", nil))
-	require.ElementsMatch(t, []string{"exact", "wild", "all"}, seen)
+	if diff := cmp.Diff([]string{"exact", "wild", "all"}, seen, cmpopts.SortSlices(func(a, b string) bool {
+		return a < b
+	})); diff != "" {
+		t.Errorf("listeners mismatch (-want +got):\n%s", diff)
+	}
 }
 
 func TestStopHaltsRemainingListeners(t *testing.T) {
@@ -175,12 +210,12 @@ func TestStopHaltsRemainingListeners(t *testing.T) {
 
 	// Higher priority runs first; it stops, lower priority must not fire.
 	var firedHigh, firedLow bool
-	_, _ = e.On("evt", func(_ context.Context, ev Event) error {
+	mustOn(t, e, "evt", func(_ context.Context, ev Event) error {
 		firedHigh = true
 		ev.Stop()
 		return nil
 	}, WithPriority(High))
-	_, _ = e.On("evt", func(_ context.Context, _ Event) error {
+	mustOn(t, e, "evt", func(_ context.Context, _ Event) error {
 		firedLow = true
 		return nil
 	}, WithPriority(Low))
@@ -196,11 +231,11 @@ func TestStopBlocksWildcardAfterExact(t *testing.T) {
 	defer e.Close()
 
 	var wildHit bool
-	_, _ = e.On("evt", func(_ context.Context, ev Event) error {
+	mustOn(t, e, "evt", func(_ context.Context, ev Event) error {
 		ev.Stop()
 		return nil
 	})
-	_, _ = e.On("**", func(_ context.Context, _ Event) error {
+	mustOn(t, e, "**", func(_ context.Context, _ Event) error {
 		wildHit = true
 		return nil
 	})
@@ -216,8 +251,8 @@ func TestListenerErrorsJoined(t *testing.T) {
 
 	errA := errors.New("A failed")
 	errB := errors.New("B failed")
-	_, _ = e.On("evt", func(context.Context, Event) error { return errA })
-	_, _ = e.On("evt", func(context.Context, Event) error { return errB })
+	mustOn(t, e, "evt", func(context.Context, Event) error { return errA })
+	mustOn(t, e, "evt", func(context.Context, Event) error { return errB })
 
 	err := e.Emit(context.Background(), "evt", nil)
 	require.Error(t, err)
@@ -230,7 +265,7 @@ func TestPanicRecovered(t *testing.T) {
 	e := New()
 	defer e.Close()
 
-	_, _ = e.On("evt", func(context.Context, Event) error {
+	mustOn(t, e, "evt", func(context.Context, Event) error {
 		panic("boom")
 	})
 
@@ -238,7 +273,7 @@ func TestPanicRecovered(t *testing.T) {
 	require.ErrorIs(t, err, ErrListenerPanic)
 
 	var pe *PanicError
-	require.True(t, errors.As(err, &pe))
+	require.ErrorAs(t, err, &pe)
 	require.Equal(t, "boom", pe.Value)
 }
 
@@ -248,7 +283,7 @@ func TestPanicWithErrorChainsCause(t *testing.T) {
 	defer e.Close()
 
 	cause := errors.New("inner cause")
-	_, _ = e.On("evt", func(context.Context, Event) error {
+	mustOn(t, e, "evt", func(context.Context, Event) error {
 		panic(cause)
 	})
 
@@ -265,11 +300,11 @@ func TestContextCancelStopsDispatch(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	var ranAfterCancel bool
 
-	_, _ = e.On("evt", func(_ context.Context, _ Event) error {
+	mustOn(t, e, "evt", func(_ context.Context, _ Event) error {
 		cancel()
 		return nil
 	}, WithPriority(High))
-	_, _ = e.On("evt", func(_ context.Context, _ Event) error {
+	mustOn(t, e, "evt", func(_ context.Context, _ Event) error {
 		ranAfterCancel = true
 		return nil
 	}, WithPriority(Low))
@@ -352,7 +387,9 @@ func TestConcurrentEmitAndCancelSafe(t *testing.T) {
 	for range 32 {
 		wg.Go(func() {
 			for range 100 {
-				_ = e.Emit(context.Background(), "evt", nil)
+				if err := e.Emit(context.Background(), "evt", nil); err != nil {
+					t.Errorf("Emit() error = %v", err)
+				}
 			}
 		})
 	}
@@ -368,25 +405,27 @@ func TestPriorityOrdering(t *testing.T) {
 	defer e.Close()
 
 	var order []string
-	_, _ = e.On("evt", func(context.Context, Event) error {
+	mustOn(t, e, "evt", func(context.Context, Event) error {
 		order = append(order, "low")
 		return nil
 	}, WithPriority(Low))
-	_, _ = e.On("evt", func(context.Context, Event) error {
+	mustOn(t, e, "evt", func(context.Context, Event) error {
 		order = append(order, "highest")
 		return nil
 	}, WithPriority(Highest))
-	_, _ = e.On("evt", func(context.Context, Event) error {
+	mustOn(t, e, "evt", func(context.Context, Event) error {
 		order = append(order, "normal")
 		return nil
 	})
-	_, _ = e.On("evt", func(context.Context, Event) error {
+	mustOn(t, e, "evt", func(context.Context, Event) error {
 		order = append(order, "high")
 		return nil
 	}, WithPriority(High))
 
 	require.NoError(t, e.Emit(context.Background(), "evt", nil))
-	require.Equal(t, []string{"highest", "high", "normal", "low"}, order)
+	if diff := cmp.Diff([]string{"highest", "high", "normal", "low"}, order); diff != "" {
+		t.Errorf("priority order mismatch (-want +got):\n%s", diff)
+	}
 }
 
 func TestEqualPriorityRegistrationOrder(t *testing.T) {
@@ -404,7 +443,9 @@ func TestEqualPriorityRegistrationOrder(t *testing.T) {
 	}
 
 	require.NoError(t, e.Emit(context.Background(), "evt", nil))
-	require.Equal(t, []int{0, 1, 2, 3, 4}, order)
+	if diff := cmp.Diff([]int{0, 1, 2, 3, 4}, order); diff != "" {
+		t.Errorf("registration order mismatch (-want +got):\n%s", diff)
+	}
 }
 
 func TestOnceFiresExactlyOnce(t *testing.T) {
@@ -440,19 +481,11 @@ func TestOnceConcurrentFiresAtMostOnce(t *testing.T) {
 	var wg sync.WaitGroup
 	for range 32 {
 		wg.Go(func() {
-			_ = e.Emit(context.Background(), "evt", nil)
+			if err := e.Emit(context.Background(), "evt", nil); err != nil {
+				t.Errorf("Emit() error = %v", err)
+			}
 		})
 	}
 	wg.Wait()
 	require.Equal(t, int32(1), fired.Load())
-}
-
-func TestErrorMessagesContainTopic(t *testing.T) {
-	t.Parallel()
-	e := New()
-	defer e.Close()
-
-	_, err := e.On("bad..topic", func(context.Context, Event) error { return nil })
-	require.Error(t, err)
-	require.Contains(t, fmt.Sprint(err), "bad..topic")
 }

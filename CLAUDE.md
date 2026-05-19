@@ -4,13 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**emitter** is an in-memory pub/sub primitive for Go 1.26.2. The core dispatches synchronously in priority order, supports `*` / `**` wildcard subscriptions, recovers listener panics into typed errors, and ships with **zero third-party dependencies**.
+**emitter** is an in-memory pub/sub primitive for the Go version declared in `go.mod`. The core dispatches synchronously in priority order, supports `*` / `**` wildcard subscriptions, recovers listener panics into typed errors, and ships with **zero third-party dependencies**.
 
 Bounded asynchronous dispatch lives in a sibling module `emitter/pool` (combined via `go.work`) so users who never need it pay nothing for it.
 
 - **Module**: `github.com/kaptinlin/emitter`
 - **Sibling module**: `github.com/kaptinlin/emitter/pool`
-- **Go Version**: `1.26.2`
+- **Go version**: see `go.mod`
 - **License**: MIT
 - **Usage Docs**: [README.md](README.md)
 - **Examples**: [examples/README.md](examples/README.md)
@@ -89,7 +89,7 @@ emitter/
 
 ### Must Follow
 
-- Use Go 1.26.2 features when they make code smaller or clearer (`range over int`, `WaitGroup.Go`, `slices.*`, etc.).
+- Use the Go version declared in `go.mod` and features when they make code smaller or clearer (`range over int`, `WaitGroup.Go`, `slices.*`, etc.).
 - Follow Google Go Best Practices and Google Go Style Decisions.
 - Return errors instead of panicking in production code.
 - Keep public APIs thread-safe; document any non-obvious lock ordering near the field declarations.

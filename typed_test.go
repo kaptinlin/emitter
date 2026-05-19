@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 )
 
@@ -26,7 +27,9 @@ func TestSubscribeTypedDelivery(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, Publish(context.Background(), e, "user.created", userCreated{ID: "u1", Name: "Ada"}))
-	require.Equal(t, userCreated{ID: "u1", Name: "Ada"}, got)
+	if diff := cmp.Diff(userCreated{ID: "u1", Name: "Ada"}, got); diff != "" {
+		t.Errorf("payload mismatch (-want +got):\n%s", diff)
+	}
 }
 
 func TestSubscribePayloadTypeMismatch(t *testing.T) {
@@ -68,7 +71,9 @@ func TestPublishIsTypeSafeOnEntry(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, Publish(context.Background(), e, "order.shipped", orderShipped{Order: 42}))
-	require.Equal(t, orderShipped{Order: 42}, <-got)
+	if diff := cmp.Diff(orderShipped{Order: 42}, <-got); diff != "" {
+		t.Errorf("payload mismatch (-want +got):\n%s", diff)
+	}
 }
 
 func TestSubscribeListenerErrorPropagates(t *testing.T) {
@@ -104,5 +109,7 @@ func TestSubscribeWildcardPattern(t *testing.T) {
 	for v := range got {
 		collected = append(collected, v)
 	}
-	require.Equal(t, []int{1, 2}, collected)
+	if diff := cmp.Diff([]int{1, 2}, collected); diff != "" {
+		t.Errorf("payloads mismatch (-want +got):\n%s", diff)
+	}
 }

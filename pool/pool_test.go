@@ -13,6 +13,13 @@ import (
 	"github.com/kaptinlin/emitter/pool"
 )
 
+func mustOn(t *testing.T, e *emitter.Emitter, pattern string, listener emitter.Listener) emitter.Subscription {
+	t.Helper()
+	sub, err := e.On(pattern, listener)
+	require.NoError(t, err)
+	return sub
+}
+
 func TestPoolDispatchesAsync(t *testing.T) {
 	t.Parallel()
 	p := pool.New(4, 16)
@@ -22,19 +29,51 @@ func TestPoolDispatchesAsync(t *testing.T) {
 	defer e.Close()
 
 	done := make(chan struct{})
-	_, err := e.On("evt", func(context.Context, emitter.Event) error {
+	mustOn(t, e, "evt", func(context.Context, emitter.Event) error {
 		close(done)
 		return nil
 	})
-	require.NoError(t, err)
 
-	require.NoError(t, p.Submit(context.Background(), e, "evt", nil))
+	require.NoError(t, p.Submit(t.Context(), e, "evt", nil))
 
 	select {
 	case <-done:
 	case <-time.After(time.Second):
 		t.Fatal("listener did not run within 1s")
 	}
+}
+
+func TestPoolNewClampsInvalidLimits(t *testing.T) {
+	t.Parallel()
+	p := pool.New(0, 0)
+	defer p.Close()
+
+	e := emitter.New()
+	defer e.Close()
+
+	done := make(chan struct{})
+	mustOn(t, e, "evt", func(context.Context, emitter.Event) error {
+		close(done)
+		return nil
+	})
+
+	require.NoError(t, p.Submit(t.Context(), e, "evt", nil))
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("listener did not run within 1s")
+	}
+}
+
+func TestPoolSubmitAfterCloseReturnsErrPoolFull(t *testing.T) {
+	t.Parallel()
+	p := pool.New(1, 1)
+	p.Close()
+
+	e := emitter.New()
+	defer e.Close()
+
+	require.ErrorIs(t, p.Submit(t.Context(), e, "evt", nil), pool.ErrPoolFull)
 }
 
 func TestPoolFullReturnsErrPoolFull(t *testing.T) {
@@ -47,19 +86,20 @@ func TestPoolFullReturnsErrPoolFull(t *testing.T) {
 	defer e.Close()
 
 	hold := make(chan struct{})
-	_, _ = e.On("evt", func(context.Context, emitter.Event) error {
+	mustOn(t, e, "evt", func(context.Context, emitter.Event) error {
 		<-hold
 		return nil
 	})
 
+	ctx := t.Context()
 	// First submit occupies the worker; second fills the queue.
-	require.NoError(t, p.Submit(context.Background(), e, "evt", nil))
-	require.NoError(t, p.Submit(context.Background(), e, "evt", nil))
+	require.NoError(t, p.Submit(ctx, e, "evt", nil))
+	require.NoError(t, p.Submit(ctx, e, "evt", nil))
 
 	// Subsequent submits while both worker & queue are full must error.
 	gotFull := false
 	for range 16 {
-		if err := p.Submit(context.Background(), e, "evt", nil); err != nil {
+		if err := p.Submit(ctx, e, "evt", nil); err != nil {
 			require.ErrorIs(t, err, pool.ErrPoolFull)
 			gotFull = true
 			break
@@ -78,15 +118,17 @@ func TestPoolCloseWaitsForInFlight(t *testing.T) {
 	defer e.Close()
 
 	var fired atomic.Int32
-	_, _ = e.On("evt", func(context.Context, emitter.Event) error {
-		time.Sleep(20 * time.Millisecond)
+	release := make(chan struct{})
+	mustOn(t, e, "evt", func(context.Context, emitter.Event) error {
+		<-release
 		fired.Add(1)
 		return nil
 	})
 
 	for range 4 {
-		require.NoError(t, p.Submit(context.Background(), e, "evt", nil))
+		require.NoError(t, p.Submit(t.Context(), e, "evt", nil))
 	}
+	close(release)
 	p.Close()
 	require.Equal(t, int32(4), fired.Load())
 }
@@ -102,12 +144,12 @@ func TestPoolSwallowsListenerErrors(t *testing.T) {
 
 	var ran sync.WaitGroup
 	ran.Add(1)
-	_, _ = e.On("evt", func(context.Context, emitter.Event) error {
+	mustOn(t, e, "evt", func(context.Context, emitter.Event) error {
 		defer ran.Done()
 		return errSentinel
 	})
 
-	require.NoError(t, p.Submit(context.Background(), e, "evt", nil))
+	require.NoError(t, p.Submit(t.Context(), e, "evt", nil))
 	ran.Wait()
 }
 

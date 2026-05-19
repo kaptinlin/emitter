@@ -13,12 +13,18 @@ func ExampleEmitter_On() {
 	e := emitter.New()
 	defer e.Close()
 
-	_, _ = e.On("user.created", func(_ context.Context, ev emitter.Event) error {
+	if _, err := e.On("user.created", func(_ context.Context, ev emitter.Event) error {
 		fmt.Printf("topic=%s payload=%v\n", ev.Topic(), ev.Payload())
 		return nil
-	})
+	}); err != nil {
+		fmt.Println(err)
+		return
+	}
 
-	_ = e.Emit(context.Background(), "user.created", "u-42")
+	if err := e.Emit(context.Background(), "user.created", "u-42"); err != nil {
+		fmt.Println(err)
+		return
+	}
 	// Output: topic=user.created payload=u-42
 }
 
@@ -27,17 +33,29 @@ func ExampleEmitter_wildcards() {
 	e := emitter.New()
 	defer e.Close()
 
-	_, _ = e.On("user.*", func(_ context.Context, ev emitter.Event) error {
+	if _, err := e.On("user.*", func(_ context.Context, ev emitter.Event) error {
 		fmt.Printf("user.*: %s\n", ev.Topic())
 		return nil
-	})
-	_, _ = e.On("metric.**", func(_ context.Context, ev emitter.Event) error {
+	}); err != nil {
+		fmt.Println(err)
+		return
+	}
+	if _, err := e.On("metric.**", func(_ context.Context, ev emitter.Event) error {
 		fmt.Printf("metric.**: %s\n", ev.Topic())
 		return nil
-	})
+	}); err != nil {
+		fmt.Println(err)
+		return
+	}
 
-	_ = e.Emit(context.Background(), "user.created", nil)
-	_ = e.Emit(context.Background(), "metric.cpu.idle", nil)
+	if err := e.Emit(context.Background(), "user.created", nil); err != nil {
+		fmt.Println(err)
+		return
+	}
+	if err := e.Emit(context.Background(), "metric.cpu.idle", nil); err != nil {
+		fmt.Println(err)
+		return
+	}
 	// Output:
 	// user.*: user.created
 	// metric.**: metric.cpu.idle
@@ -48,14 +66,24 @@ func ExampleSubscription_Cancel() {
 	e := emitter.New()
 	defer e.Close()
 
-	sub, _ := e.On("evt", func(context.Context, emitter.Event) error {
+	sub, err := e.On("evt", func(context.Context, emitter.Event) error {
 		fmt.Println("fired")
 		return nil
 	})
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 
-	_ = e.Emit(context.Background(), "evt", nil)
+	if err := e.Emit(context.Background(), "evt", nil); err != nil {
+		fmt.Println(err)
+		return
+	}
 	sub.Cancel()
-	_ = e.Emit(context.Background(), "evt", nil) // no listener
+	if err := e.Emit(context.Background(), "evt", nil); err != nil {
+		fmt.Println(err)
+		return
+	}
 	// Output: fired
 }
 
@@ -64,18 +92,27 @@ func ExampleEvent_Stop() {
 	e := emitter.New()
 	defer e.Close()
 
-	_, _ = e.On("evt", func(_ context.Context, ev emitter.Event) error {
+	if _, err := e.On("evt", func(_ context.Context, ev emitter.Event) error {
 		fmt.Println("guard")
 		ev.Stop()
 		return nil
-	}, emitter.WithPriority(emitter.High))
+	}, emitter.WithPriority(emitter.High)); err != nil {
+		fmt.Println(err)
+		return
+	}
 
-	_, _ = e.On("evt", func(context.Context, emitter.Event) error {
+	if _, err := e.On("evt", func(context.Context, emitter.Event) error {
 		fmt.Println("never runs")
 		return nil
-	}, emitter.WithPriority(emitter.Low))
+	}, emitter.WithPriority(emitter.Low)); err != nil {
+		fmt.Println(err)
+		return
+	}
 
-	_ = e.Emit(context.Background(), "evt", nil)
+	if err := e.Emit(context.Background(), "evt", nil); err != nil {
+		fmt.Println(err)
+		return
+	}
 	// Output: guard
 }
 
@@ -84,9 +121,12 @@ func ExampleEmitter_Emit_errors() {
 	e := emitter.New()
 	defer e.Close()
 
-	_, _ = e.On("evt", func(context.Context, emitter.Event) error {
+	if _, err := e.On("evt", func(context.Context, emitter.Event) error {
 		return errors.New("boom")
-	})
+	}); err != nil {
+		fmt.Println(err)
+		return
+	}
 
 	err := e.Emit(context.Background(), "evt", nil)
 	fmt.Println(err)
@@ -100,12 +140,18 @@ func ExampleSubscribe() {
 	e := emitter.New()
 	defer e.Close()
 
-	_, _ = emitter.Subscribe(e, "order.shipped",
+	if _, err := emitter.Subscribe(e, "order.shipped",
 		func(_ context.Context, _ emitter.Event, p orderShipped) error {
 			fmt.Println("shipped:", p.ID)
 			return nil
-		})
+		}); err != nil {
+		fmt.Println(err)
+		return
+	}
 
-	_ = emitter.Publish(context.Background(), e, "order.shipped", orderShipped{ID: "ord-7"})
+	if err := emitter.Publish(context.Background(), e, "order.shipped", orderShipped{ID: "ord-7"}); err != nil {
+		fmt.Println(err)
+		return
+	}
 	// Output: shipped: ord-7
 }

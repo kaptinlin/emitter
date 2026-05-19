@@ -2,6 +2,8 @@ package emitter
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestIsValidTopicName(t *testing.T) {
@@ -37,9 +39,7 @@ func TestIsValidTopicName(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			if got := isValidTopicName(tc.topic); got != tc.isValid {
-				t.Errorf("isValidTopicName(%q) = %v, want %v", tc.topic, got, tc.isValid)
-			}
+			require.Equal(t, tc.isValid, isValidTopicName(tc.topic))
 		})
 	}
 }
@@ -48,19 +48,21 @@ func TestHasWildcard(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
+		name    string
 		pattern string
 		want    bool
 	}{
-		{"user.created", false},
-		{"user.*", true},
-		{"**", true},
-		{"a.**.b", true},
-		{"a.b.c", false},
+		{"literal topic", "user.created", false},
+		{"single wildcard", "user.*", true},
+		{"multi wildcard", "**", true},
+		{"interior multi wildcard", "a.**.b", true},
+		{"many literal segments", "a.b.c", false},
 	}
 	for _, tc := range cases {
-		if got := hasWildcard(tc.pattern); got != tc.want {
-			t.Errorf("hasWildcard(%q) = %v, want %v", tc.pattern, got, tc.want)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			require.Equal(t, tc.want, hasWildcard(tc.pattern))
+		})
 	}
 }
 
@@ -112,10 +114,7 @@ func TestMatchTopicPattern(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			if got := matchTopicPattern(tc.pattern, tc.subject); got != tc.want {
-				t.Errorf("matchTopicPattern(%q, %q) = %v, want %v",
-					tc.pattern, tc.subject, got, tc.want)
-			}
+			require.Equal(t, tc.want, matchTopicPattern(tc.pattern, tc.subject))
 		})
 	}
 }

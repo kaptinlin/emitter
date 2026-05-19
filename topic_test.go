@@ -6,6 +6,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 )
 
@@ -29,7 +30,9 @@ func TestBucketAddPriorityOrder(t *testing.T) {
 	for _, it := range b.sorted {
 		got = append(got, it.id)
 	}
-	require.Equal(t, []uint64{2, 4, 1, 3, 5}, got)
+	if diff := cmp.Diff([]uint64{2, 4, 1, 3, 5}, got); diff != "" {
+		t.Errorf("priority order mismatch (-want +got):\n%s", diff)
+	}
 }
 
 func TestBucketAddPreservesRegistrationOrderAtEqualPriority(t *testing.T) {
@@ -46,7 +49,9 @@ func TestBucketAddPreservesRegistrationOrderAtEqualPriority(t *testing.T) {
 	for _, it := range b.sorted {
 		got = append(got, it.id)
 	}
-	require.Equal(t, []uint64{1, 2, 3, 4, 5}, got)
+	if diff := cmp.Diff([]uint64{1, 2, 3, 4, 5}, got); diff != "" {
+		t.Errorf("registration order mismatch (-want +got):\n%s", diff)
+	}
 }
 
 func TestBucketRemoveDeletesMatchingListener(t *testing.T) {
@@ -121,7 +126,7 @@ func TestBucketTriggerStopHaltsLoop(t *testing.T) {
 		},
 	})
 
-	_ = b.trigger(context.Background(), &event{topic: "x"})
+	require.Empty(t, b.trigger(context.Background(), &event{topic: "x"}))
 	require.False(t, second)
 }
 
@@ -139,7 +144,9 @@ func TestBucketRemoveDuringTriggerIsSafe(t *testing.T) {
 
 	wg.Go(func() {
 		for range 100 {
-			_ = b.trigger(context.Background(), &event{topic: "x"})
+			if errs := b.trigger(context.Background(), &event{topic: "x"}); len(errs) > 0 {
+				t.Errorf("trigger returned errors: %v", errs)
+			}
 		}
 	})
 	for i := range 8 {

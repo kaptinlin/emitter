@@ -2,7 +2,7 @@
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/kaptinlin/emitter.svg)](https://pkg.go.dev/github.com/kaptinlin/emitter)
 [![Go Report Card](https://goreportcard.com/badge/github.com/kaptinlin/emitter)](https://goreportcard.com/report/github.com/kaptinlin/emitter)
-[![Go Version](https://img.shields.io/badge/Go-1.26.2+-blue.svg)](https://go.dev/)
+[![Go Module](https://img.shields.io/badge/Go-module-blue.svg)](https://go.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 An in-memory pub/sub primitive for Go. Synchronous, ordered, panic-safe — and small enough to read in a sitting.
@@ -29,7 +29,7 @@ For high-throughput fire-and-forget dispatch, an optional sibling module ([`emit
 go get github.com/kaptinlin/emitter
 ```
 
-Requires Go 1.26.2+.
+Requires the Go version declared in `go.mod`.
 
 ## Quick start
 
