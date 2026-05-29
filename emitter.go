@@ -99,33 +99,8 @@ func (e *Emitter) Emit(ctx context.Context, topic string, payload any) error {
 	}
 
 	ev := &event{topic: topic, payload: payload}
-	var errs []error
-
-	if v, ok := e.exact.Load(topic); ok {
-		if list := v.(*bucket).trigger(ctx, ev); len(list) > 0 {
-			errs = append(errs, list...)
-		}
-	}
-
-	if ev.stopped {
-		return errors.Join(errs...)
-	}
-	if cur := e.wildcard.Load(); cur != nil && len(*cur) > 0 {
-		subjectParts := strings.Split(topic, ".")
-		for _, w := range *cur {
-			if !matchParts(w.parts, subjectParts, 0, 0) {
-				continue
-			}
-			if list := w.bucket.trigger(ctx, ev); len(list) > 0 {
-				errs = append(errs, list...)
-			}
-			if ev.stopped {
-				break
-			}
-		}
-	}
-
-	return errors.Join(errs...)
+	items := e.matchingListeners(topic)
+	return errors.Join(triggerItems(ctx, ev, items)...)
 }
 
 // Close prevents further emits. Idempotent — calling Close more than once is safe.
@@ -135,6 +110,40 @@ func (e *Emitter) Emit(ctx context.Context, topic string, payload any) error {
 // reachable through Subscription.Cancel for cleanup.
 func (e *Emitter) Close() {
 	e.closed.Store(true)
+}
+
+func (e *Emitter) matchingListeners(topic string) []dispatchItem {
+	var items []dispatchItem
+	if v, ok := e.exact.Load(topic); ok {
+		items = append(items, v.(*bucket).snapshot()...)
+	}
+
+	cur := e.wildcard.Load()
+	if cur == nil || len(*cur) == 0 {
+		return items
+	}
+
+	subjectParts := strings.Split(topic, ".")
+	for _, w := range *cur {
+		if matchParts(w.parts, subjectParts, 0, 0) {
+			items = append(items, w.bucket.snapshot()...)
+		}
+	}
+	slices.SortStableFunc(items, func(a, b dispatchItem) int {
+		switch {
+		case a.item.priority > b.item.priority:
+			return -1
+		case a.item.priority < b.item.priority:
+			return 1
+		case a.item.id < b.item.id:
+			return -1
+		case a.item.id > b.item.id:
+			return 1
+		default:
+			return 0
+		}
+	})
+	return items
 }
 
 func (e *Emitter) ensureExact(pattern string) *bucket {

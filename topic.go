@@ -15,6 +15,11 @@ type listenerItem struct {
 	fired    atomic.Bool // for Once: at-most-once across concurrent emits
 }
 
+type dispatchItem struct {
+	bucket *bucket
+	item   *listenerItem
+}
+
 // bucket is the internal listener registry for a single pattern.
 // Dispatch uses a snapshot taken under RLock and runs listeners outside
 // the lock to keep listener bodies free to call back into the Emitter.
@@ -48,17 +53,30 @@ func (b *bucket) remove(id uint64) {
 	})
 }
 
-// trigger dispatches ev to all registered listeners in priority order.
-// Returns the slice of errors collected; the caller decides how to combine them.
-func (b *bucket) trigger(ctx context.Context, ev *event) []error {
+func (b *bucket) snapshot() []dispatchItem {
 	b.mu.RLock()
 	items := slices.Clone(b.sorted)
 	b.mu.RUnlock()
 
-	var errs []error
-	var onceIDs []uint64
+	dispatch := make([]dispatchItem, len(items))
+	for i, it := range items {
+		dispatch[i] = dispatchItem{bucket: b, item: it}
+	}
+	return dispatch
+}
 
-	for _, it := range items {
+// trigger dispatches ev to all registered listeners in priority order.
+// Returns the slice of errors collected; the caller decides how to combine them.
+func (b *bucket) trigger(ctx context.Context, ev *event) []error {
+	return triggerItems(ctx, ev, b.snapshot())
+}
+
+func triggerItems(ctx context.Context, ev *event, items []dispatchItem) []error {
+	var errs []error
+	onceByBucket := make(map[*bucket][]uint64)
+
+	for _, dispatch := range items {
+		it := dispatch.item
 		if err := ctx.Err(); err != nil {
 			errs = append(errs, err)
 			break
@@ -70,15 +88,15 @@ func (b *bucket) trigger(ctx context.Context, ev *event) []error {
 			errs = append(errs, err)
 		}
 		if it.once {
-			onceIDs = append(onceIDs, it.id)
+			onceByBucket[dispatch.bucket] = append(onceByBucket[dispatch.bucket], it.id)
 		}
 		if ev.stopped {
 			break
 		}
 	}
 
-	if len(onceIDs) > 0 {
-		b.removeMany(onceIDs)
+	for bucket, onceIDs := range onceByBucket {
+		bucket.removeMany(onceIDs)
 	}
 	return errs
 }

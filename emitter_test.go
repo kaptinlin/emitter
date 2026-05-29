@@ -203,6 +203,48 @@ func TestExactAndWildcardBothFire(t *testing.T) {
 	}
 }
 
+func TestExactAndWildcardListenersSharePriorityOrder(t *testing.T) {
+	t.Parallel()
+	e := New()
+	defer e.Close()
+
+	var order []string
+	mustOn(t, e, "evt", func(context.Context, Event) error {
+		order = append(order, "exact-low")
+		return nil
+	}, WithPriority(Low))
+	mustOn(t, e, "**", func(context.Context, Event) error {
+		order = append(order, "wild-high")
+		return nil
+	}, WithPriority(High))
+
+	require.NoError(t, e.Emit(context.Background(), "evt", nil))
+	if diff := cmp.Diff([]string{"wild-high", "exact-low"}, order); diff != "" {
+		t.Errorf("listener order mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestExactAndWildcardListenersShareRegistrationOrder(t *testing.T) {
+	t.Parallel()
+	e := New()
+	defer e.Close()
+
+	var order []string
+	mustOn(t, e, "**", func(context.Context, Event) error {
+		order = append(order, "wild")
+		return nil
+	})
+	mustOn(t, e, "evt", func(context.Context, Event) error {
+		order = append(order, "exact")
+		return nil
+	})
+
+	require.NoError(t, e.Emit(context.Background(), "evt", nil))
+	if diff := cmp.Diff([]string{"wild", "exact"}, order); diff != "" {
+		t.Errorf("listener order mismatch (-want +got):\n%s", diff)
+	}
+}
+
 func TestStopHaltsRemainingListeners(t *testing.T) {
 	t.Parallel()
 	e := New()
