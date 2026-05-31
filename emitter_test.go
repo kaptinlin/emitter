@@ -176,6 +176,21 @@ func TestWildcardSubscriptionMulti(t *testing.T) {
 	require.Equal(t, int32(3), count.Load())
 }
 
+func TestInteriorMultiWildcardSkipsNonMatchingSuffix(t *testing.T) {
+	t.Parallel()
+	e := New()
+	defer e.Close()
+
+	var hits int
+	mustOn(t, e, "user.**.v2", func(context.Context, Event) error {
+		hits++
+		return nil
+	})
+
+	require.NoError(t, e.Emit(context.Background(), "user.profile.v3", nil))
+	require.Zero(t, hits)
+}
+
 func TestExactAndWildcardBothFire(t *testing.T) {
 	t.Parallel()
 	e := New()
@@ -356,6 +371,47 @@ func TestContextCancelStopsDispatch(t *testing.T) {
 	require.False(t, ranAfterCancel)
 }
 
+func TestContextCanceledBeforeDispatchSkipsListeners(t *testing.T) {
+	t.Parallel()
+	e := New()
+	defer e.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	var fired bool
+	mustOn(t, e, "evt", func(context.Context, Event) error {
+		fired = true
+		return nil
+	})
+
+	err := e.Emit(ctx, "evt", nil)
+	require.ErrorIs(t, err, context.Canceled)
+	require.False(t, fired)
+}
+
+func TestCloseDuringEmitDoesNotInterruptSnapshot(t *testing.T) {
+	t.Parallel()
+	e := New()
+
+	var order []string
+	mustOn(t, e, "evt", func(context.Context, Event) error {
+		order = append(order, "first")
+		e.Close()
+		return nil
+	}, WithPriority(High))
+	mustOn(t, e, "evt", func(context.Context, Event) error {
+		order = append(order, "second")
+		return nil
+	}, WithPriority(Low))
+
+	require.NoError(t, e.Emit(context.Background(), "evt", nil))
+	if diff := cmp.Diff([]string{"first", "second"}, order); diff != "" {
+		t.Errorf("listener order mismatch (-want +got):\n%s", diff)
+	}
+	require.ErrorIs(t, e.Emit(context.Background(), "evt", nil), ErrEmitterClosed)
+}
+
 func TestSubscriptionCancelRemovesListener(t *testing.T) {
 	t.Parallel()
 	e := New()
@@ -506,6 +562,23 @@ func TestOnceFiresExactlyOnce(t *testing.T) {
 		require.NoError(t, e.Emit(context.Background(), "evt", nil))
 	}
 	require.Equal(t, 1, count)
+}
+
+func TestOnceListenerRemovedAfterError(t *testing.T) {
+	t.Parallel()
+	e := New()
+	defer e.Close()
+
+	wantErr := errors.New("once failed")
+	var calls atomic.Int32
+	mustOn(t, e, "evt", func(context.Context, Event) error {
+		calls.Add(1)
+		return wantErr
+	}, Once())
+
+	require.ErrorIs(t, e.Emit(context.Background(), "evt", nil), wantErr)
+	require.NoError(t, e.Emit(context.Background(), "evt", nil))
+	require.Equal(t, int32(1), calls.Load())
 }
 
 func TestOnceConcurrentFiresAtMostOnce(t *testing.T) {

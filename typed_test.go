@@ -78,6 +78,25 @@ func TestSubscribeNilCallback(t *testing.T) {
 	require.ErrorIs(t, err, ErrNilListener)
 }
 
+func TestSubscribeRejectsInvalidPattern(t *testing.T) {
+	t.Parallel()
+	e := New()
+	defer e.Close()
+
+	_, err := Subscribe(e, "evt..bad", func(context.Context, Event, int) error {
+		return nil
+	})
+	require.ErrorIs(t, err, ErrInvalidTopicName)
+}
+
+func TestPublishPropagatesEmitterErrors(t *testing.T) {
+	t.Parallel()
+	e := New()
+	e.Close()
+
+	require.ErrorIs(t, Publish(context.Background(), e, "evt", 1), ErrEmitterClosed)
+}
+
 func TestPublishIsTypeSafeOnEntry(t *testing.T) {
 	t.Parallel()
 	e := New()
