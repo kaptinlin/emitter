@@ -12,6 +12,7 @@ type listenerItem struct {
 	listener Listener
 	priority Priority
 	once     bool
+	filter   func(Event) error
 	fired    atomic.Bool // for Once: at-most-once across concurrent emits
 }
 
@@ -80,6 +81,12 @@ func triggerItems(ctx context.Context, ev *event, items []dispatchItem) []error 
 		if err := ctx.Err(); err != nil {
 			errs = append(errs, err)
 			break
+		}
+		if it.filter != nil {
+			if err := it.filter(ev); err != nil {
+				errs = append(errs, err)
+				continue
+			}
 		}
 		if it.once && !it.fired.CompareAndSwap(false, true) {
 			continue

@@ -13,6 +13,7 @@ type ListenerOption func(*listenerOpts)
 type listenerOpts struct {
 	priority Priority
 	once     bool
+	filter   func(Event) error
 }
 
 // WithPriority sets the listener's dispatch priority.

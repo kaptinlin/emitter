@@ -24,11 +24,26 @@ func Subscribe[T any](
 	return e.On(pattern, func(ctx context.Context, ev Event) error {
 		payload, ok := ev.Payload().(T)
 		if !ok {
-			var zero T
-			return fmt.Errorf("%w: topic %q expected %T, got %T", ErrPayloadType, ev.Topic(), zero, ev.Payload())
+			return payloadTypeError[T](ev)
 		}
 		return fn(ctx, ev, payload)
-	}, opts...)
+	}, append(opts, withPayloadTypeFilter[T]())...)
+}
+
+func withPayloadTypeFilter[T any]() ListenerOption {
+	return func(o *listenerOpts) {
+		o.filter = func(ev Event) error {
+			if _, ok := ev.Payload().(T); !ok {
+				return payloadTypeError[T](ev)
+			}
+			return nil
+		}
+	}
+}
+
+func payloadTypeError[T any](ev Event) error {
+	var zero T
+	return fmt.Errorf("%w: topic %q expected %T, got %T", ErrPayloadType, ev.Topic(), zero, ev.Payload())
 }
 
 // Publish is sugar over [Emitter.Emit] with a typed payload.

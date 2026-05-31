@@ -69,6 +69,7 @@ func (e *Emitter) On(pattern string, listener Listener, opts ...ListenerOption) 
 		listener: listener,
 		priority: o.priority,
 		once:     o.once,
+		filter:   o.filter,
 	}
 
 	if hasWildcard(pattern) {

@@ -47,6 +47,28 @@ func TestSubscribePayloadTypeMismatch(t *testing.T) {
 	require.ErrorIs(t, emitErr, ErrPayloadType)
 }
 
+func TestSubscribeOnceTypeMismatchDoesNotConsumeListener(t *testing.T) {
+	t.Parallel()
+	e := New()
+	defer e.Close()
+
+	var got int
+	_, err := Subscribe(e, "evt", func(_ context.Context, _ Event, p int) error {
+		got = p
+		return nil
+	}, Once())
+	require.NoError(t, err)
+
+	require.ErrorIs(t, Publish(context.Background(), e, "evt", "not the right type"), ErrPayloadType)
+	require.Zero(t, got)
+
+	require.NoError(t, Publish(context.Background(), e, "evt", 42))
+	require.Equal(t, 42, got)
+
+	require.NoError(t, Publish(context.Background(), e, "evt", 99))
+	require.Equal(t, 42, got)
+}
+
 func TestSubscribeNilCallback(t *testing.T) {
 	t.Parallel()
 	e := New()
