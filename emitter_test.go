@@ -301,6 +301,27 @@ func TestStopBlocksWildcardAfterExact(t *testing.T) {
 	require.False(t, wildHit, "wildcard listener should not fire after Stop")
 }
 
+func TestStopWithErrorHaltsRemainingListeners(t *testing.T) {
+	t.Parallel()
+	e := New()
+	defer e.Close()
+
+	wantErr := errors.New("stop failed")
+	var firedLow bool
+	mustOn(t, e, "evt", func(_ context.Context, ev Event) error {
+		ev.Stop()
+		return wantErr
+	}, WithPriority(High))
+	mustOn(t, e, "evt", func(context.Context, Event) error {
+		firedLow = true
+		return nil
+	}, WithPriority(Low))
+
+	err := e.Emit(context.Background(), "evt", nil)
+	require.ErrorIs(t, err, wantErr)
+	require.False(t, firedLow)
+}
+
 func TestListenerErrorsJoined(t *testing.T) {
 	t.Parallel()
 	e := New()
@@ -369,6 +390,41 @@ func TestContextCancelStopsDispatch(t *testing.T) {
 	err := e.Emit(ctx, "evt", nil)
 	require.ErrorIs(t, err, context.Canceled)
 	require.False(t, ranAfterCancel)
+}
+
+func TestContextCanceledByLastListenerIsReturned(t *testing.T) {
+	t.Parallel()
+	e := New()
+	defer e.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	mustOn(t, e, "evt", func(context.Context, Event) error {
+		cancel()
+		return nil
+	})
+
+	require.ErrorIs(t, e.Emit(ctx, "evt", nil), context.Canceled)
+}
+
+func TestContextCancelAndStopReturnsContextError(t *testing.T) {
+	t.Parallel()
+	e := New()
+	defer e.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	var ranAfterStop bool
+	mustOn(t, e, "evt", func(_ context.Context, ev Event) error {
+		cancel()
+		ev.Stop()
+		return nil
+	}, WithPriority(High))
+	mustOn(t, e, "evt", func(context.Context, Event) error {
+		ranAfterStop = true
+		return nil
+	}, WithPriority(Low))
+
+	require.ErrorIs(t, e.Emit(ctx, "evt", nil), context.Canceled)
+	require.False(t, ranAfterStop)
 }
 
 func TestContextCanceledBeforeDispatchSkipsListeners(t *testing.T) {
@@ -579,6 +635,24 @@ func TestOnceListenerRemovedAfterError(t *testing.T) {
 	require.ErrorIs(t, e.Emit(context.Background(), "evt", nil), wantErr)
 	require.NoError(t, e.Emit(context.Background(), "evt", nil))
 	require.Equal(t, int32(1), calls.Load())
+}
+
+func TestOnceWildcardFiresOnceAcrossMatchingTopics(t *testing.T) {
+	t.Parallel()
+	e := New()
+	defer e.Close()
+
+	var got []string
+	mustOn(t, e, "user.*", func(_ context.Context, ev Event) error {
+		got = append(got, ev.Topic())
+		return nil
+	}, Once())
+
+	require.NoError(t, e.Emit(context.Background(), "user.created", nil))
+	require.NoError(t, e.Emit(context.Background(), "user.deleted", nil))
+	if diff := cmp.Diff([]string{"user.created"}, got); diff != "" {
+		t.Errorf("fired topics mismatch (-want +got):\n%s", diff)
+	}
 }
 
 func TestOnceConcurrentFiresAtMostOnce(t *testing.T) {

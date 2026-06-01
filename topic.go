@@ -97,6 +97,10 @@ func triggerItems(ctx context.Context, ev *event, items []dispatchItem) []error 
 		if it.once {
 			onceByBucket[dispatch.bucket] = append(onceByBucket[dispatch.bucket], it.id)
 		}
+		if err := ctx.Err(); err != nil {
+			errs = append(errs, err)
+			break
+		}
 		if ev.stopped {
 			break
 		}
