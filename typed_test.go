@@ -69,6 +69,23 @@ func TestSubscribeOnceTypeMismatchDoesNotConsumeListener(t *testing.T) {
 	require.Equal(t, 42, got)
 }
 
+func TestSubscribeInterfacePayloadAcceptsNil(t *testing.T) {
+	t.Parallel()
+	e := New()
+	defer e.Close()
+
+	var called bool
+	_, err := Subscribe[error](e, "evt", func(_ context.Context, _ Event, p error) error {
+		called = true
+		require.NoError(t, p)
+		return nil
+	})
+	require.NoError(t, err)
+
+	require.NoError(t, Publish[error](context.Background(), e, "evt", nil))
+	require.True(t, called)
+}
+
 func TestSubscribeNilCallback(t *testing.T) {
 	t.Parallel()
 	e := New()
