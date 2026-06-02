@@ -79,6 +79,24 @@ func TestOnInvalidPattern(t *testing.T) {
 	}
 }
 
+func TestOnIgnoresNilListenerOption(t *testing.T) {
+	t.Parallel()
+	e := New()
+	defer e.Close()
+
+	var called bool
+	require.NotPanics(t, func() {
+		_, err := e.On("evt", func(context.Context, Event) error {
+			called = true
+			return nil
+		}, nil)
+		require.NoError(t, err)
+	})
+
+	require.NoError(t, e.Emit(context.Background(), "evt", nil))
+	require.True(t, called)
+}
+
 func TestEmitInvalidTopic(t *testing.T) {
 	t.Parallel()
 	e := New()

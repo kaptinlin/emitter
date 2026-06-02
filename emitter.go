@@ -36,7 +36,9 @@ type wildEntry struct {
 func New(opts ...Option) *Emitter {
 	cfg := &config{}
 	for _, opt := range opts {
-		opt(cfg)
+		if opt != nil {
+			opt(cfg)
+		}
 	}
 	return &Emitter{}
 }
@@ -61,7 +63,9 @@ func (e *Emitter) On(pattern string, listener Listener, opts ...ListenerOption) 
 
 	o := &listenerOpts{}
 	for _, opt := range opts {
-		opt(o)
+		if opt != nil {
+			opt(o)
+		}
 	}
 
 	item := &listenerItem{
