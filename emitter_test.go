@@ -127,6 +127,31 @@ func TestEmitterClosed(t *testing.T) {
 	require.ErrorIs(t, err, ErrEmitterClosed)
 }
 
+func TestOnReturnsClosedWhenCloseWinsRegistrationRace(t *testing.T) {
+	t.Parallel()
+	e := New()
+
+	checked := make(chan struct{})
+	release := make(chan struct{})
+	errCh := make(chan error, 1)
+
+	go func() {
+		_, err := e.On("evt", func(context.Context, Event) error {
+			return nil
+		}, ListenerOption(func(*listenerOpts) {
+			close(checked)
+			<-release
+		}))
+		errCh <- err
+	}()
+
+	<-checked
+	e.Close()
+	close(release)
+
+	require.ErrorIs(t, <-errCh, ErrEmitterClosed)
+}
+
 func TestEmitterCloseIdempotent(t *testing.T) {
 	t.Parallel()
 	e := New()

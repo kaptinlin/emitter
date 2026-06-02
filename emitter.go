@@ -16,6 +16,8 @@ import (
 //
 // The zero value of Emitter is not usable; always construct via [New].
 type Emitter struct {
+	closeMu sync.Mutex // serializes On's final closed check with Close
+
 	exact    sync.Map                    // string -> *bucket (exact patterns, O(1) lookup)
 	wildcard atomic.Pointer[[]wildEntry] // copy-on-write list of wildcard patterns
 	wildMu   sync.Mutex                  // serializes writes to wildcard
@@ -68,6 +70,12 @@ func (e *Emitter) On(pattern string, listener Listener, opts ...ListenerOption) 
 		}
 	}
 
+	e.closeMu.Lock()
+	defer e.closeMu.Unlock()
+	if e.closed.Load() {
+		return nil, ErrEmitterClosed
+	}
+
 	item := &listenerItem{
 		id:       e.nextID.Add(1),
 		listener: listener,
@@ -114,7 +122,9 @@ func (e *Emitter) Emit(ctx context.Context, topic string, payload any) error {
 // were already snapshotted. Listeners registered before Close continue to be
 // reachable through Subscription.Cancel for cleanup.
 func (e *Emitter) Close() {
+	e.closeMu.Lock()
 	e.closed.Store(true)
+	e.closeMu.Unlock()
 }
 
 func (e *Emitter) matchingListeners(topic string) []dispatchItem {
