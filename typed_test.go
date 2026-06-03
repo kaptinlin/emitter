@@ -45,6 +45,7 @@ func TestSubscribePayloadTypeMismatch(t *testing.T) {
 
 	emitErr := e.Emit(context.Background(), "evt", "not the right type")
 	require.ErrorIs(t, emitErr, ErrPayloadType)
+	require.ErrorContains(t, emitErr, `topic "evt" expected emitter.userCreated, got string: emitter: payload type mismatch`)
 }
 
 func TestSubscribeOnceTypeMismatchDoesNotConsumeListener(t *testing.T) {
@@ -163,7 +164,7 @@ func TestSubscribeWildcardPattern(t *testing.T) {
 	require.NoError(t, Publish(context.Background(), e, "metric.cpu", 1))
 	require.NoError(t, Publish(context.Background(), e, "metric.mem.used", 2))
 	close(got)
-	collected := []int{}
+	var collected []int
 	for v := range got {
 		collected = append(collected, v)
 	}

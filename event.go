@@ -1,7 +1,7 @@
 package emitter
 
-// Event is the read-only view delivered to a [Listener] for a single emission.
-// Payload is immutable for the lifetime of an emit.
+// Event is the view delivered to a [Listener] for a single emission.
+// The emitter does not mutate Payload; listeners receive the value passed to Emit.
 type Event interface {
 	// Topic returns the topic the event was emitted on.
 	Topic() string

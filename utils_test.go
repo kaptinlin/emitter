@@ -73,7 +73,7 @@ func matchTopicPattern(pattern, subject string) bool {
 }
 
 func splitTopic(s string) []string {
-	parts := []string{}
+	var parts []string
 	start := 0
 	for i := 0; i < len(s); i++ {
 		if s[i] == '.' {

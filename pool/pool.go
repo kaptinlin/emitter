@@ -42,7 +42,7 @@ type Pool struct {
 }
 
 // New constructs a Pool. maxWorkers caps concurrent dispatch goroutines;
-// maxQueue caps pending submissions. Both must be >= 1.
+// maxQueue caps pending submissions. Values less than 1 are clamped to 1.
 func New(maxWorkers, maxQueue int) *Pool {
 	maxWorkers = max(maxWorkers, 1)
 	maxQueue = max(maxQueue, 1)

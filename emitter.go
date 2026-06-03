@@ -57,7 +57,7 @@ func (e *Emitter) On(pattern string, listener Listener, opts ...ListenerOption) 
 		return nil, ErrNilListener
 	}
 	if !isValidTopicName(pattern) {
-		return nil, fmt.Errorf("%w: %q", ErrInvalidTopicName, pattern)
+		return nil, fmt.Errorf("pattern %q: %w", pattern, ErrInvalidTopicName)
 	}
 	if e.closed.Load() {
 		return nil, ErrEmitterClosed
@@ -105,10 +105,10 @@ func (e *Emitter) Emit(ctx context.Context, topic string, payload any) error {
 		return ErrEmitterClosed
 	}
 	if !isValidTopicName(topic) {
-		return fmt.Errorf("%w: %q", ErrInvalidTopicName, topic)
+		return fmt.Errorf("topic %q: %w", topic, ErrInvalidTopicName)
 	}
 	if hasWildcard(topic) {
-		return fmt.Errorf("%w: emit topic must not contain wildcards: %q", ErrInvalidTopicName, topic)
+		return fmt.Errorf("emit topic %q must not contain wildcards: %w", topic, ErrInvalidTopicName)
 	}
 
 	ev := &event{topic: topic, payload: payload}
@@ -144,20 +144,22 @@ func (e *Emitter) matchingListeners(topic string) []dispatchItem {
 			items = append(items, w.bucket.snapshot()...)
 		}
 	}
-	slices.SortStableFunc(items, func(a, b dispatchItem) int {
-		switch {
-		case a.item.priority > b.item.priority:
-			return -1
-		case a.item.priority < b.item.priority:
-			return 1
-		case a.item.id < b.item.id:
-			return -1
-		case a.item.id > b.item.id:
-			return 1
-		default:
-			return 0
-		}
-	})
+	if len(items) > 1 {
+		slices.SortStableFunc(items, func(a, b dispatchItem) int {
+			switch {
+			case a.item.priority > b.item.priority:
+				return -1
+			case a.item.priority < b.item.priority:
+				return 1
+			case a.item.id < b.item.id:
+				return -1
+			case a.item.id > b.item.id:
+				return 1
+			default:
+				return 0
+			}
+		})
+	}
 	return items
 }
 

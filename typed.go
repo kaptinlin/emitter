@@ -56,7 +56,7 @@ func payloadAs[T any](payload any) (T, bool) {
 }
 
 func payloadTypeError[T any](ev Event) error {
-	return fmt.Errorf("%w: topic %q expected %v, got %T", ErrPayloadType, ev.Topic(), reflect.TypeFor[T](), ev.Payload())
+	return fmt.Errorf("topic %q expected %v, got %T: %w", ev.Topic(), reflect.TypeFor[T](), ev.Payload(), ErrPayloadType)
 }
 
 // Publish is sugar over [Emitter.Emit] with a typed payload.

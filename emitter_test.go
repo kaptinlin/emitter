@@ -76,6 +76,7 @@ func TestOnInvalidPattern(t *testing.T) {
 	for _, bad := range []string{"", "user.", ".user", "user..created", "用户"} {
 		_, err := e.On(bad, func(context.Context, Event) error { return nil })
 		require.ErrorIsf(t, err, ErrInvalidTopicName, "pattern %q should be invalid", bad)
+		require.ErrorContains(t, err, `pattern "`+bad+`": emitter: invalid topic name`)
 	}
 }
 
@@ -113,8 +114,13 @@ func TestEmitWildcardTopicRejected(t *testing.T) {
 	e := New()
 	defer e.Close()
 
-	require.ErrorIs(t, e.Emit(context.Background(), "user.*", nil), ErrInvalidTopicName)
-	require.ErrorIs(t, e.Emit(context.Background(), "**", nil), ErrInvalidTopicName)
+	err := e.Emit(context.Background(), "user.*", nil)
+	require.ErrorIs(t, err, ErrInvalidTopicName)
+	require.ErrorContains(t, err, `emit topic "user.*" must not contain wildcards: emitter: invalid topic name`)
+
+	err = e.Emit(context.Background(), "**", nil)
+	require.ErrorIs(t, err, ErrInvalidTopicName)
+	require.ErrorContains(t, err, `emit topic "**" must not contain wildcards: emitter: invalid topic name`)
 }
 
 func TestEmitterClosed(t *testing.T) {
@@ -370,8 +376,8 @@ func TestListenerErrorsJoined(t *testing.T) {
 	e := New()
 	defer e.Close()
 
-	errA := errors.New("A failed")
-	errB := errors.New("B failed")
+	errA := errors.New("a failed")
+	errB := errors.New("b failed")
 	mustOn(t, e, "evt", func(context.Context, Event) error { return errA })
 	mustOn(t, e, "evt", func(context.Context, Event) error { return errB })
 

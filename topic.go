@@ -74,7 +74,7 @@ func (b *bucket) trigger(ctx context.Context, ev *event) []error {
 
 func triggerItems(ctx context.Context, ev *event, items []dispatchItem) []error {
 	var errs []error
-	onceByBucket := make(map[*bucket][]uint64)
+	var onceByBucket map[*bucket][]uint64
 
 	for _, dispatch := range items {
 		it := dispatch.item
@@ -95,6 +95,9 @@ func triggerItems(ctx context.Context, ev *event, items []dispatchItem) []error 
 			errs = append(errs, err)
 		}
 		if it.once {
+			if onceByBucket == nil {
+				onceByBucket = make(map[*bucket][]uint64)
+			}
 			onceByBucket[dispatch.bucket] = append(onceByBucket[dispatch.bucket], it.id)
 		}
 		if err := ctx.Err(); err != nil {
