@@ -25,6 +25,8 @@ vars:
       {{.GOLANGCI_LINT_BINARY}} version --format short 2>/dev/null ||
       {{.GOLANGCI_LINT_BINARY}} version --short 2>/dev/null ||
       echo "not-installed"
+  MODULES:
+    sh: printf '. ./pool\n'
 
 env:
   GOBIN: '{{.GOBIN}}'
@@ -54,9 +56,13 @@ tasks:
   deps:
     desc: Download Go module dependencies
     cmds:
-      - echo "Downloading dependencies..."
-      - go mod download
-      - go mod tidy
+      - |
+        set -e
+        echo "Downloading dependencies..."
+        for dir in {{.MODULES}}; do
+          echo "==> $dir"
+          (cd "$dir" && GOWORK=off go mod download && GOWORK=off go mod tidy)
+        done
 
 
   deps:update:
@@ -87,9 +93,9 @@ tasks:
               echo "$replaced" | grep -qxF "$dep" || echo "$dep"
             done | tr '\n' ' ')
             if [ -n "$deps" ]; then
-              go get -u $deps
+              GOWORK=off go get -u $deps
             fi
-            go mod tidy
+            GOWORK=off go mod tidy
           )
         done
         if [ -f go.work ]; then
@@ -98,10 +104,15 @@ tasks:
         fi
 
   test:
-    desc: Run all tests with race detection
+    desc: Run all module tests with race detection
     cmds:
-      - echo "Running all tests..."
-      - go test -race ./...
+      - |
+        set -e
+        echo "Running all tests..."
+        for dir in {{.MODULES}}; do
+          echo "==> $dir"
+          (cd "$dir" && GOWORK=off go test -race ./...)
+        done
 
   test-fuzz:
     desc: Run fuzz tests
@@ -141,15 +152,26 @@ tasks:
       - install-golangci-lint
     cmds:
       - '{{.GOLANGCI_LINT_BINARY}} version'
-      - echo "Running golangci-lint..."
-      - '{{.GOLANGCI_LINT_BINARY}} run --timeout=30m --concurrency=1 --path-prefix=.'
+      - |
+        set -e
+        echo "Running golangci-lint..."
+        lint_binary="{{.GOLANGCI_LINT_BINARY}}"
+        for dir in {{.MODULES}}; do
+          echo "==> $dir"
+          (cd "$dir" && GOWORK=off "$lint_binary" run --timeout=30m --concurrency=1 --path-prefix=.)
+        done
 
   tidy-lint:
     desc: Check if go.mod and go.sum are tidy
     cmds:
-      - echo "Checking go.mod and go.sum are tidy..."
-      - go mod tidy
-      - git diff --exit-code -- go.mod go.sum
+      - |
+        set -e
+        echo "Checking go.mod and go.sum are tidy..."
+        for dir in {{.MODULES}}; do
+          echo "==> $dir"
+          (cd "$dir" && GOWORK=off go mod tidy)
+        done
+        git diff --exit-code -- go.mod go.sum pool/go.mod pool/go.sum
 
   yamllint:
     desc: Run yamllint
@@ -159,21 +181,37 @@ tasks:
   vuln:
     desc: Run govulncheck
     cmds:
-      - govulncheck ./...
+      - |
+        set -e
+        for dir in {{.MODULES}}; do
+          echo "==> $dir"
+          (cd "$dir" && GOWORK=off govulncheck ./...)
+        done
 
   fmt:
     desc: Format Go code
     deps:
       - install-golangci-lint
     cmds:
-      - echo "Formatting Go code..."
-      - '{{.GOLANGCI_LINT_BINARY}} fmt ./...'
+      - |
+        set -e
+        echo "Formatting Go code..."
+        lint_binary="{{.GOLANGCI_LINT_BINARY}}"
+        for dir in {{.MODULES}}; do
+          echo "==> $dir"
+          (cd "$dir" && GOWORK=off "$lint_binary" fmt ./...)
+        done
 
   vet:
     desc: Run go vet
     cmds:
-      - echo "Running go vet..."
-      - go vet ./...
+      - |
+        set -e
+        echo "Running go vet..."
+        for dir in {{.MODULES}}; do
+          echo "==> $dir"
+          (cd "$dir" && GOWORK=off go vet ./...)
+        done
 
   verify:
     desc: Run all verification steps (deps, format, vet, lint, test, vuln)

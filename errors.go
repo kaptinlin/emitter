@@ -36,7 +36,7 @@ func (e *PanicError) Error() string {
 	return fmt.Sprintf("emitter: listener panicked: %v", e.Value)
 }
 
-// Unwrap returns the chained errors so errors.Is and errors.As traverse them.
+// Unwrap returns the chained errors so errors.Is and errors.AsType traverse them.
 func (e *PanicError) Unwrap() []error {
 	if e.cause != nil {
 		return []error{ErrListenerPanic, e.cause}

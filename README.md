@@ -116,7 +116,7 @@ _, _ = e.On("evt", func(_ context.Context, ev emitter.Event) error {
 err := e.Emit(ctx, "evt", payload)
 ```
 
-- All listener errors are joined via `errors.Join`. Use `errors.Is` / `errors.As` to inspect.
+- All listener errors are joined via `errors.Join`. Use `errors.Is` / `errors.AsType` to inspect typed errors.
 - A panicking listener returns a `*PanicError` wrapping `ErrListenerPanic`. The raw panic value is on `pe.Value`; if it was an `error`, it appears in the unwrap chain too.
 - Cancelling `ctx` mid-dispatch surfaces `ctx.Err()` in the joined result and skips remaining listeners.
 - Sentinels: `ErrEmitterClosed`, `ErrInvalidTopicName`, `ErrNilListener`, `ErrListenerPanic`, `ErrPayloadType`.

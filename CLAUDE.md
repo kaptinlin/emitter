@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **emitter** is an in-memory pub/sub primitive for the Go version declared in `go.mod`. The core dispatches synchronously in priority order, supports `*` / `**` wildcard subscriptions, recovers listener panics into typed errors, and ships with **zero third-party dependencies**.
 
-Bounded asynchronous dispatch lives in a sibling module `emitter/pool` (combined via `go.work`) so users who never need it pay nothing for it.
+Bounded asynchronous dispatch lives in a sibling module `emitter/pool` so users who never need it pay nothing for it.
 
 - **Module**: `github.com/kaptinlin/emitter`
 - **Sibling module**: `github.com/kaptinlin/emitter/pool`
@@ -18,20 +18,19 @@ Bounded asynchronous dispatch lives in a sibling module `emitter/pool` (combined
 ## Commands
 
 ```bash
-task test        # Run `go test -race ./...`
-task lint        # Run golangci-lint and the go mod tidy check
+task test        # Run `go test -race ./...` in root and pool modules
+task lint        # Run golangci-lint and tidy checks in root and pool modules
 task test-fuzz   # Run fuzz coverage for topic matching
 task clean       # Remove local build artifacts and test cache
 task verify      # Run deps, fmt, vet, lint, test, and vuln checks
 ```
 
-The pool sibling has its own module; lint/test it from `pool/` or via the workspace at the repo root.
+The pool sibling has its own module; root Task commands run module-aware checks for both the core and pool modules.
 
 ## Architecture
 
 ```text
 emitter/
-├── go.work               # combines root + ./pool
 ├── go.mod                # core: stdlib only (testify is dev-only)
 ├── doc.go                # package doc — topic grammar, dispatch semantics
 ├── emitter.go            # Emitter struct: exact sync.Map + COW wildcard list
@@ -122,13 +121,13 @@ When you hit a bug or limitation in a dependency library:
 
 - Sentinels: `ErrEmitterClosed`, `ErrInvalidTopicName`, `ErrNilListener`, `ErrListenerPanic`, `ErrPayloadType`. The pool module adds `pool.ErrPoolFull`.
 - Listener panics are wrapped in `*PanicError`. Match with `errors.Is(err, ErrListenerPanic)`. If the panic value is itself an `error`, it appears in the unwrap chain too — match with `errors.Is(err, originalCause)`.
-- `Emit` returns `errors.Join(...)` of all listener errors. Use `errors.Is` / `errors.As` to inspect.
+- `Emit` returns `errors.Join(...)` of all listener errors. Use `errors.Is` / `errors.AsType` to inspect typed errors.
 - Cancelling `ctx` mid-dispatch surfaces `ctx.Err()` in the joined result and skips remaining listeners.
 - `Subscribe[T]` returns `ErrPayloadType` (joined into the emit result) when the published payload's dynamic type does not match `T`. The typed listener is not invoked in that case.
 
 ## Testing
 
-- Run `task test` before finishing work in the root module; run `go test -race ./...` from `pool/` for pool changes.
+- Run `task lint` and `task test` before finishing work; both cover the root and pool modules.
 - Use `t.Parallel()` for independent tests.
 - Prefer table-driven tests for grammar / matching / priority behavior.
 - Topic-matching changes must keep `task test-fuzz` clean — `FuzzMatchTopicPattern` exercises both validator and matcher.
