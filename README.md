@@ -29,7 +29,7 @@ For high-throughput fire-and-forget dispatch, an optional sibling module ([`emit
 go get github.com/kaptinlin/emitter
 ```
 
-Requires the Go version declared in `go.mod`.
+Requires Go 1.26.4 or newer.
 
 ## Quick start
 

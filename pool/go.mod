@@ -1,6 +1,6 @@
 module github.com/kaptinlin/emitter/pool
 
-go 1.26.3
+go 1.26.4
 
 require (
 	github.com/alitto/pond v1.9.2
