@@ -4,7 +4,7 @@ go 1.26.4
 
 require (
 	github.com/alitto/pond v1.9.2
-	github.com/kaptinlin/emitter v0.5.1
+	github.com/kaptinlin/emitter v0.5.2
 	github.com/stretchr/testify v1.11.1
 )
 
