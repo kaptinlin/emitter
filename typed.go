@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"slices"
 )
 
 // Subscribe registers a typed listener on e. The callback receives the event
@@ -23,13 +24,14 @@ func Subscribe[T any](
 	if fn == nil {
 		return nil, ErrNilListener
 	}
+	listenerOpts := append(slices.Clone(opts), withPayloadTypeFilter[T]())
 	return e.On(pattern, func(ctx context.Context, ev Event) error {
 		payload, ok := payloadAs[T](ev.Payload())
 		if !ok {
 			return payloadTypeError[T](ev)
 		}
 		return fn(ctx, ev, payload)
-	}, append(opts, withPayloadTypeFilter[T]())...)
+	}, listenerOpts...)
 }
 
 func withPayloadTypeFilter[T any]() ListenerOption {

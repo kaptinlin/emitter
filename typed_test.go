@@ -32,6 +32,22 @@ func TestSubscribeTypedDelivery(t *testing.T) {
 	}
 }
 
+func TestSubscribeDoesNotMutateListenerOptions(t *testing.T) {
+	t.Parallel()
+	e := New()
+	defer e.Close()
+
+	options := make([]ListenerOption, 1, 2)
+	options[0] = WithPriority(High)
+	shared := options[:cap(options)]
+
+	_, err := Subscribe(e, "evt", func(context.Context, Event, int) error {
+		return nil
+	}, options...)
+	require.NoError(t, err)
+	require.Nil(t, shared[1], "Subscribe must not append into caller-owned option storage")
+}
+
 func TestSubscribePayloadTypeMismatch(t *testing.T) {
 	t.Parallel()
 	e := New()
