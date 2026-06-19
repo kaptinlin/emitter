@@ -47,3 +47,23 @@ func TestSubscriptionCancelOnUnknownPatternIsSafe(t *testing.T) {
 	s2 := &subscription{emitter: e, pattern: "ghost.*", id: 999}
 	require.NotPanics(t, s2.Cancel)
 }
+
+func TestSubscriptionCancelAfterCloseRemovesListener(t *testing.T) {
+	t.Parallel()
+
+	for _, pattern := range []string{"evt", "**"} {
+		t.Run(pattern, func(t *testing.T) {
+			t.Parallel()
+			e := New()
+
+			sub := mustOn(t, e, pattern, func(context.Context, Event) error { return nil })
+			require.Len(t, e.matchingListeners("evt"), 1)
+
+			e.Close()
+			sub.Cancel()
+
+			require.Empty(t, e.matchingListeners("evt"))
+			require.NotPanics(t, sub.Cancel)
+		})
+	}
+}
